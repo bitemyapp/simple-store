@@ -88,9 +88,8 @@ makeCellSomeStoreState :: IO StoreCellSomeStoreState
 
 ``` haskell
 
-
 someStateManip :: IO ()
-    acell <- makeCellSomeStoreState
+n    acell <- makeCellSomeStoreState
     drId  <- insertState acell SomeStoreState
     rslt  <- queryCell acell allConsistentStates 
     ast   <- getState acell drId

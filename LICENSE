@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 Copyright (c) 2014, Scott
+=======
+Copyright (c) 2014, Kevin Cotrone
+>>>>>>> 1d182ba89c08145fec060375738b70901707f4a9
 
 All rights reserved.
 
@@ -13,7 +17,11 @@ modification, are permitted provided that the following conditions are met:
       disclaimer in the documentation and/or other materials provided
       with the distribution.
 
+<<<<<<< HEAD
     * Neither the name of Scott nor the names of other
+=======
+    * Neither the name of Kevin Cotrone nor the names of other
+>>>>>>> 1d182ba89c08145fec060375738b70901707f4a9
       contributors may be used to endorse or promote products derived
       from this software without specific prior written permission.
 
