@@ -11,7 +11,8 @@ getSimpleStore :: SimpleStore st -> IO st
 getSimpleStore store = atomically . readTVar . storeState $ store
 
 putSimpleStore :: SimpleStore st -> st -> IO ()
-putSimpleStore = undefined
+putSimpleStore store state = atomically . (writeTVar tState) $ state
+  where tState = storeState store
 
 openSimpleStore :: FilePath -> IO (Either StoreError (SimpleStore st))
 openSimpleStore fp = undefined

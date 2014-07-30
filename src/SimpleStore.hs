@@ -5,9 +5,8 @@ module SimpleStore (
   , makeSimpleStore
   , closeSimpleStore
   , modifySimpleStore
-  , SimpleStore(..)
-  , StoreLock
-  , StoreError
+  , SimpleStore
+  , StoreError(..)
 ) where
 
 import           Control.Concurrent.STM.TMVar
