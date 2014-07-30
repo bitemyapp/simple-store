@@ -26,6 +26,7 @@ Library
                       , bytestring
                       , unix
                       , text
+                      , safe
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0

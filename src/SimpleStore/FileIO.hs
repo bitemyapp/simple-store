@@ -1,33 +1,39 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module SimpleStore.FileIO where
 
 import           Control.Applicative
-import qualified Data.ByteString     as BS
+import           Control.Exception
+import           Control.Monad             hiding (sequence)
+import qualified Data.ByteString           as BS
 import           Data.Serialize
 import           Data.Traversable
-import           Filesystem
+import           Filesystem                hiding (readFile, writeFile)
 import           Filesystem.Path
-import           Prelude             hiding (FilePath, readFile, writeFile, sequence)
+import           Filesystem.Path.CurrentOS hiding (encode)
+import           Prelude                   hiding (FilePath, sequence)
+import           Safe
+import           SimpleStore.Internal
 import           SimpleStore.Types
 import           System.IO.Error
-import SimpleStore.Internal
-import Control.Exception
+import           System.Posix.Process
 
-ableToBreakLock :: FilePath -> IO (Either String ())
+ableToBreakLock :: FilePath -> IO (Either StoreError FilePath)
 ableToBreakLock fp = do
   fileExists <- isFile fp
   if fileExists
     then do
-      ePid <- readFile fp >>= return . decode
-      exists <- sequence $ processExists <$> ePid
-      return $ removeFalse exists
-    else return $ Right ()
-  where removeFalse :: Either String Bool -> Either String ()
-        removeFalse (Right False) = Left "Lock already exists and process is still running"
-        removeFalse (Right True) = Right ()
-        removeFalse (Left s) = Left s
-
+      ePid <- readFile (encodeString fp) >>= return . readMay :: IO (Maybe Int)
+      putStrLn . show $ ePid
+      case ePid of
+        Just pid -> do
+          exists <- processExists pid
+          if exists
+            then return . Left . StoreIOError $ "Process holding open.lock is already running"
+            else return $ Right fp
+        Nothing -> return . Left . StoreIOError $ "Unable to parse open.lock"
+    else return $ Right fp
 
 ableToBreakLockError :: IOError -> Bool
 ableToBreakLockError e
@@ -38,8 +44,17 @@ ableToBreakLockError e
 
 -- | Create a lock file with the current process pid in it
 -- The lock file should already be empty or non existent
-createLock :: FilePath -> Int -> IO (Either String ())
-createLock fp pid = do
-  catch (Right <$> writeFile fp (encode pid)) showError
-  where showError :: IOException -> IO (Either String ())
-        showError e = return . Left . show $ e
+createLock :: FilePath -> IO (Either StoreError ())
+createLock fp = do
+  pid <- getProcessID
+  catch (Right <$> writeFile (encodeString fp) (show pid)) showError
+  where showError :: IOException -> IO (Either StoreError ())
+        showError e = return . Left . StoreIOError . show $ e
+
+attemptTakeLock :: FilePath -> IO (Either StoreError ())
+attemptTakeLock baseFP = do
+  let fp = baseFP </> (fromText "open.lock")
+  allowBreak <- ableToBreakLock fp
+  res <- sequence $ createLock <$> allowBreak
+  return . join $ res
+

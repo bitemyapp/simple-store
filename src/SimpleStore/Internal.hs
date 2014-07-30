@@ -37,5 +37,5 @@ withLock store func = do
 processExists :: Int -> IO Bool
 processExists s = catch (getProcessPriority (CPid . fromIntegral $ s) >> return True) handleNotFound
   where
-    handleNotFound :: SomeException -> IO Bool
+    handleNotFound :: IOException -> IO Bool
     handleNotFound _ = return False
