@@ -17,12 +17,15 @@ Library
   Other-Modules:        SimpleStore.Internal
                       , SimpleStore.Types
                       , SimpleStore.IO
+                      , SimpleStore.FileIO
   Build-Depends:        base >= 4 && < 5
                       , stm
                       , system-fileio
                       , system-filepath
                       , cereal
                       , bytestring
+                      , unix
+                      , text
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
