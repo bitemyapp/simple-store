@@ -1,52 +1,11 @@
 # simple-cell
 
-<<<<<<< HEAD
-Often in haskell you have a shared data type that needs persistence, atomicity and consistency.
-=======
 Simple Store  takes a filename generating function and a SimpleStore
 it then generates the machinery to handle the creation of multiple atomic values of this type according to the unique keys of each one.
->>>>>>> 65d75a5aa525f2ac7b6b4ad24e2d3c12e0b80361
 
 
 ## Usage
 
-<<<<<<< HEAD
-The core datatype for SimpleStore is
-
-``` haskell
-
-data SimpleStore st = SimpleStore {
-    storeFP     :: FilePath
-  , storeState  :: TVar st
-  , storeLock   :: TMVar StoreLock
-  , storeHandle :: Maybe Handle
-}
-
-
-```
-
-Say your Datatype is :
-
-``` haskell
-
-data Address = Address { street :: Street , town::Town}
-  deriving (Generic,Eq,Ord)
-
-instance Serialize Address where 
-
-
-``` haskell
-
-You might write:
-
-``` haskell
--- | makeSimpleStore :: FilePath -> st -> IO (Either StoreError (SimpleStore st))
-
-djangosAddress = do
-   eSt(makeSimpleStore "DjangoAddress" (Address MinorSwingBlvd GypsyTown))
-   either (\e -> fail (show e) ) (return st)  eSt
-
-=======
 ### Inputs ...
 
 AcidCells are designed to take a function to retrieve keys and a function to make those keys into filenames
@@ -129,37 +88,16 @@ makeCellSomeStoreState :: IO StoreCellSomeStoreState
 
 ``` haskell
 
+
 someStateManip :: IO ()
-n    acell <- makeCellSomeStoreState
+    acell <- makeCellSomeStoreState
     drId  <- insertState acell SomeStoreState
     rslt  <- queryCell acell allConsistentStates 
     ast   <- getState acell drId
     deleteState drId 
     
->>>>>>> 65d75a5aa525f2ac7b6b4ad24e2d3c12e0b80361
 
 ```
-A directory containing a serialized version of Django's address is saved for you
-**Note** you can use text serialization too so it is readable.
 
-
-Now you can share that between processes (in a Yesod for instance)
-
-<<<<<<< HEAD
-
-
-lets walk there
-``` haskell
-
-
-walkToDjangosHouse :: IO () 
-walkToDjangosHouse = do
-  djAddr <- getSimpleStore djangosAddress
-  walkToDjangosHouse djAddr 
-
-```
-=======
 a *DirectedKeyRaw* is a key with a source and a destination.  The source and destination are very arbitrary but were
 created to deal with database keys coming from multiple locations.  
-
->>>>>>> 65d75a5aa525f2ac7b6b4ad24e2d3c12e0b80361
