@@ -1,0 +1,3 @@
+module SimpleStore.Internal
+    (
+    ) where
