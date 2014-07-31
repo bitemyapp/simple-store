@@ -10,13 +10,13 @@ import Filesystem.Path
 
 
 data SimpleStore st = SimpleStore {
-    storeFP                :: FilePath
+    storeFP                :: TVar FilePath
   , storeState             :: TVar st
   , storeLock              :: TMVar StoreLock
-  , storeHandle            :: TVar Handle
-  , storeCheckpointVersion :: Int
+  , storeHandle            :: TMVar Handle
+  , storeCheckpointVersion :: TVar Int
 }
 
 data StoreLock = StoreLock
 
-data StoreError = StoreAlreadyOpen | StoreLocked | StoreIOError String deriving (Show, Eq)
+data StoreError = StoreAlreadyOpen | StoreClosed | StoreLocked | StoreFolderNotFound | StoreCheckpointNotFound | StoreIOError String deriving (Show, Eq)

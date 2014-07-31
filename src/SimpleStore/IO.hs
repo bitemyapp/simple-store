@@ -1,44 +1,73 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 module SimpleStore.IO where
 
+import           Control.Applicative
 import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent.STM.TVar
+import           Control.Monad                hiding (sequence)
 import           Control.Monad.STM
+import           Data.Bifunctor
+import qualified Data.ByteString              as BS
 import           Data.Maybe                   (Maybe)
+import           Data.Maybe
+import           Data.Serialize
+import qualified Data.Serialize               as S
+import           Data.Text                    hiding (filter, map, maximum,
+                                               stripPrefix)
+import           Data.Text.Read
+import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
-import           Prelude                      hiding (FilePath, writeFile)
+import           Filesystem.Path.CurrentOS    hiding (decode)
+import           Prelude                      hiding (FilePath, sequence,
+                                               writeFile)
+import           Safe
+import           SimpleStore.FileIO
+import           SimpleStore.Internal
 import           SimpleStore.Types
-import           System.IO                    (Handle)
-import Filesystem.Path.CurrentOS
-import Data.Text
-import SimpleStore.FileIO
-import qualified Data.Serialize as S
+import           System.IO                    (Handle, hClose)
 
 getSimpleStore :: SimpleStore st -> IO st
 getSimpleStore store = atomically . readTVar . storeState $ store
 
 putSimpleStore :: SimpleStore st -> st -> IO ()
-putSimpleStore store state = atomically . (writeTVar tState) $ state
-  where tState = storeState store
+putSimpleStore store state = withLock store $ putWriteStore store state
 
-openSimpleStore :: FilePath -> IO (Either StoreError (SimpleStore st))
-openSimpleStore dir = undefined
+openSimpleStore :: (S.Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
+openSimpleStore dir = do
+  exists <- isDirectory dir
+  if exists
+    then do
+      dirContents <- listDirectory dir
+      print dirContents
+      let files = filter isState dirContents
+      print files
+      modifiedDates <- traverse (\file -> do
+                                    t <- getModified file
+                                    return (t,file)) files
+      print modifiedDates
+      case maximumMay modifiedDates of
+        (Just (_, lastFile)) -> do
+          let eVersion = getVersionNumber . filename $ lastFile
+          fHandle <- openFile lastFile ReadWriteMode
+          fConts <- BS.hGetContents fHandle
+          let dec = decode fConts
+          sequence $ first (StoreIOError . show) $  (createStore lastFile fHandle) <$> eVersion <*> dec
+        Nothing -> return . Left $ StoreCheckpointNotFound
+    else return . Left $ StoreFolderNotFound
+
 
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 makeSimpleStore dir state = do
   fp <- initializeDirectory dir
-  lockRes <- attemptTakeLock fp
-  st <- newTVarIO state
-  lock <- newTMVarIO StoreLock
   let encodedState = S.encode state
-  let checkpointPath = fp </> (fromText . pack $ "checkpoint" ++ (show initialVersion) ++ ".st")
+      checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ "checkpoint.st")
+      initialVersion = 0
   writeFile checkpointPath encodedState
   handle <- openFile checkpointPath AppendMode
-  tHandle <- newTVarIO handle
-  return . Right $ SimpleStore fp st lock tHandle initialVersion
-  where initialVersion = 0
-  
+  Right <$> createStore fp handle initialVersion state
+
 
 initializeDirectory :: FilePath -> IO FilePath
 initializeDirectory dir = do
@@ -54,10 +83,26 @@ initializeDirectory dir = do
 
 
 closeSimpleStore :: SimpleStore st -> IO ()
-closeSimpleStore store = undefined
+closeSimpleStore store = withLock store $ do
+  closeStoreHandle store
+  releaseFileLock store
+
 
 modifySimpleStore :: SimpleStore st -> (st -> IO st) -> IO (Either StoreError ())
-modifySimpleStore store func = undefined
+modifySimpleStore store func = withLock store $ do
+  state <- readTVarIO tState
+  res <- func state
+  Right <$> (atomically $ writeTVar tState res)
+  where tState = storeState store
 
-
-createCheckpointSimpleStore
+createCheckpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
+createCheckpoint store = withLock store $ do
+  fp <- directory <$> (readTVarIO . storeFP $ store)
+  state <- readTVarIO tState
+  newVersion <- (+1) <$> (readTVarIO tVersion)
+  atomically $ writeTVar tVersion newVersion
+  let encodedState = S.encode state
+      checkpointPath = fp </> (fromText . pack $ (show newVersion) ++ "checkpoint.st")
+  return . Right $ ()
+  where tState = storeState store
+        tVersion = storeCheckpointVersion store

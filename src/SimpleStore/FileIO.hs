@@ -18,6 +18,7 @@ import           SimpleStore.Internal
 import           SimpleStore.Types
 import           System.IO.Error
 import           System.Posix.Process
+import Control.Concurrent.STM
 
 ableToBreakLock :: FilePath -> IO (Either StoreError FilePath)
 ableToBreakLock fp = do
@@ -58,3 +59,8 @@ attemptTakeLock baseFP = do
   res <- sequence $ createLock <$> allowBreak
   return . join $ res
 
+releaseFileLock :: SimpleStore st -> IO ()
+releaseFileLock store = do
+  fp <- (\fp -> directory fp </> (fromText "open.lock")) <$> (atomically . readTVar . storeFP $ store)
+  exists <- isFile fp
+  if exists then removeFile fp else return ()
