@@ -10,24 +10,26 @@ module SimpleStore.Internal (
   , getVersionNumber
   , createStore
   , isState
+  , closeStoreHandle
 ) where
 
 import           Control.Applicative
 import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent.STM.TVar
 import           Control.Exception
-import           Control.Monad
+import           Control.Monad hiding (sequence)
 import           Control.Monad.STM
 import           Data.Bifunctor
 import           Data.Text
 import           Data.Text.Read
 import           Filesystem.Path
 import           Filesystem.Path.CurrentOS
-import           Prelude                      hiding (FilePath)
+import           Prelude                      hiding (FilePath, sequence)
+import           Data.Traversable
 import           SimpleStore.Types
 import           System.Posix.Process
 import           System.Posix.Types
-import           System.IO                    (Handle)
+import           System.IO                    (Handle, hClose)
 
 
 
@@ -65,10 +67,17 @@ createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
 createStore fp fHandle version st = do
   sState <- newTVarIO st
   sLock <- newTMVarIO StoreLock
-  sHandle <- newTVarIO fHandle
-  return $ SimpleStore fp sState sLock sHandle version
+  sHandle <- newTMVarIO fHandle
+  sVersion <- newTVarIO version
+  sFp <- newTVarIO fp
+  return $ SimpleStore sFp sState sLock sHandle sVersion
 
 isState :: FilePath -> Bool
 isState fp = case extension fp of
               (Just ext) -> if ext == "st" then True else False
               Nothing -> False
+
+closeStoreHandle :: SimpleStore st -> IO ()
+closeStoreHandle store = do
+  mHandle <- atomically . tryTakeTMVar . storeHandle $ store
+  void . sequence $ hClose <$> mHandle

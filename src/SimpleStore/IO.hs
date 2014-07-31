@@ -26,7 +26,7 @@ import           Safe
 import           SimpleStore.FileIO
 import           SimpleStore.Internal
 import           SimpleStore.Types
-import           System.IO                    (Handle)
+import           System.IO                    (Handle, hClose)
 
 getSimpleStore :: SimpleStore st -> IO st
 getSimpleStore store = atomically . readTVar . storeState $ store
@@ -61,16 +61,12 @@ openSimpleStore dir = do
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 makeSimpleStore dir state = do
   fp <- initializeDirectory dir
-  lockRes <- attemptTakeLock fp
-  st <- newTVarIO state
-  lock <- newTMVarIO StoreLock
   let encodedState = S.encode state
-  let checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ "checkpoint.st")
+      checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ "checkpoint.st")
+      initialVersion = 0
   writeFile checkpointPath encodedState
   handle <- openFile checkpointPath AppendMode
-  tHandle <- newTVarIO handle
-  return . Right $ SimpleStore fp st lock tHandle initialVersion
-  where initialVersion = 0
+  Right <$> createStore fp handle initialVersion state
 
 
 initializeDirectory :: FilePath -> IO FilePath
@@ -87,10 +83,19 @@ initializeDirectory dir = do
 
 
 closeSimpleStore :: SimpleStore st -> IO ()
-closeSimpleStore store = undefined
+closeSimpleStore store = withLock store $ do
+  closeStoreHandle store
+  releaseFileLock store
+
 
 modifySimpleStore :: SimpleStore st -> (st -> IO st) -> IO (Either StoreError ())
-modifySimpleStore store func = undefined
+modifySimpleStore store func = withLock store $ do
+  state <- readTVarIO tState
+  res <- func state
+  Right <$> (atomically $ writeTVar tState res)
+  where tState = storeState store
 
-createCheckpoint :: SimpleStore st -> IO (Either StoreError ())
-createCheckpoint store = undefined
+--createCheckpoint :: SimpleStore st -> IO (Either StoreError ())
+--createCheckpoint store = withLock store $ do
+--  fp <- directory <$> (atomically . readTVar . storeFP $ store)
+  
