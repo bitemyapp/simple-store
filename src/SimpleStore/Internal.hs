@@ -39,7 +39,7 @@ putWriteStore store state = atomically . (writeTVar tState) $ state
 
 -- | Lock a simplestore from being able to be written to
 obtainLock :: SimpleStore st -> IO StoreLock
-obtainLock store = atomically . readTMVar . storeLock $ store
+obtainLock store = atomically . takeTMVar . storeLock $ store
 
 -- | Allow a simplestore to write to a lock
 releaseLock :: SimpleStore st -> IO ()
@@ -48,8 +48,7 @@ releaseLock store = atomically $ putTMVar (storeLock store) StoreLock
 withLock :: SimpleStore st -> IO b -> IO b
 withLock store func = do
   obtainLock store
-  res <- func
-  releaseLock store
+  res <- finally (func) (releaseLock store)
   return res
 
 processExists :: Int -> IO Bool

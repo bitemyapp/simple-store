@@ -39,6 +39,16 @@ Test-Suite spec
   Main-Is:              Spec.hs
   Build-Depends:        base
                       , hspec
+                      , stm
+                      , system-fileio
+                      , system-filepath
+                      , cereal
+                      , bytestring
+                      , unix
+                      , text
+                      , safe
+                      , bifunctors
+                      , time
 
 Source-Repository head
   Type:                 git

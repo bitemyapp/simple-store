@@ -52,19 +52,9 @@ openSimpleStore dir = do
                                     t <- getModified file   -- Traverses the second item so sequence only evaluates
                                     return (t,file)) files  -- the second item
       print modifiedDates
-      let sortedDates = sortBy (compare `on` snd) modifiedDates
-
-      case maximumMay modifiedDates of
-        (Just (_, fp)) -> do
-
-          --createStoreFromFilePath :: FilePath -> IO (Either StoreError (SimpleStore st))
-          --createStoreFromFilePath fp = do
-            let eVersion = getVersionNumber . filename $ fp
-            fHandle <- openFile fp ReadWriteMode
-            fConts <- BS.hGetContents fHandle
-            let dec = decode fConts
-            sequence $ first (StoreIOError . show) $  (createStore fp fHandle) <$> eVersion <*> dec
-        Nothing -> return . Left $ StoreCheckpointNotFound
+      let sortedDates = snd <$> sortBy (compare `on` snd) modifiedDates
+      print sortedDates
+      openNewestStore createStoreFromFilePath sortedDates
     else return . Left $ StoreFolderNotFound
 
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
@@ -74,7 +64,7 @@ makeSimpleStore dir state = do
       checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ "checkpoint.st")
       initialVersion = 0
   writeFile checkpointPath encodedState
-  handle <- openFile checkpointPath AppendMode
+  handle <- openFile checkpointPath ReadWriteMode
   Right <$> createStore fp handle initialVersion state
 
 
@@ -106,20 +96,26 @@ modifySimpleStore store func = withLock store $ do
 
 createCheckpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
 createCheckpoint store = withLock store $ do
-  fp <- directory <$> (readTVarIO . storeFP $ store)
+  fp <- readTVarIO . storeFP $ store
   state <- readTVarIO tState
-  newVersion <- (+1) <$> (readTVarIO tVersion)
-  let encodedState = S.encode state
+  oldVersion <- readTVarIO tVersion
+  let newVersion = (oldVersion + 1) `mod` 10
+      encodedState = S.encode state
+      oldCheckpointPath = fp </> (fromText . pack $ (show newVersion) ++ "checkpoint.st")
       checkpointPath = fp </> (fromText . pack $ (show newVersion) ++ "checkpoint.st")
   newHandle <- openFile checkpointPath ReadWriteMode
-  eFileRes <- catch (Right <$> writeFile checkpointPath encodedState) (return . Left . catchStoreError)
-  updateIfWritten eFileRes newVersion newHandle
+  eFileRes <- catch (Right <$> BS.hPut newHandle encodedState) (return . Left . catchStoreError)
+  updateIfWritten oldCheckpointPath eFileRes newVersion newHandle
   where tState = storeState store
         tVersion = storeCheckpointVersion store
         tHandle = storeHandle store
-        updateIfWritten l@(Left _) _ _= return l
-        updateIfWritten _ version fHandle = do
-          atomically $ do
+        updateIfWritten _ l@(Left _) _ _= return l
+        updateIfWritten old _ version fHandle = do
+          removeFile old
+          oHandle <- atomically $ do
             writeTVar tVersion version
-            takeTMVar tHandle >> putTMVar tHandle fHandle
+            oldHandle <- takeTMVar tHandle
+            putTMVar tHandle fHandle
+            return oldHandle
+          hClose oHandle
           return . Right $ ()

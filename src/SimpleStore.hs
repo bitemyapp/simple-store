@@ -7,6 +7,7 @@ module SimpleStore (
   , modifySimpleStore
   , SimpleStore
   , StoreError(..)
+  , createCheckpoint
 ) where
 
 import           Control.Concurrent.STM.TMVar
