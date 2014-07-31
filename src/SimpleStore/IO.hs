@@ -67,24 +67,6 @@ openSimpleStore dir = do
         Nothing -> return . Left $ StoreCheckpointNotFound
     else return . Left $ StoreFolderNotFound
 
-openNewestStore :: (a -> IO (Either StoreError b)) -> [a] -> IO (Either StoreError b)
-openNewestStore _ [] = return . Left $ StoreFileNotFound
-openNewestStore f (x:xs) = do
-  res <- catch (f x) (hIOException f xs)
-  case res of
-    (Left _) -> openNewestStore f xs
-    r@(Right _) -> return r
-  where  hIOException :: (a -> IO (Either StoreError b)) -> [a] -> IOException -> IO (Either StoreError b)
-         hIOException func ys _ = openNewestStore func ys
-
-createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
-createStoreFromFilePath fp = do
-  let eVersion = getVersionNumber . filename $ fp
-  fHandle <- openFile fp ReadWriteMode
-  fConts <- BS.hGetContents fHandle
-  sequence $ first (StoreIOError . show) $ (createStore fp fHandle) <$> eVersion <*> decode fConts
-
-
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 makeSimpleStore dir state = do
   fp <- initializeDirectory dir

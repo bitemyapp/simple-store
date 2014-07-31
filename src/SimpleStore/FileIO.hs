@@ -4,21 +4,22 @@
 module SimpleStore.FileIO where
 
 import           Control.Applicative
+import           Control.Concurrent.STM
 import           Control.Exception
 import           Control.Monad             hiding (sequence)
+import           Data.Bifunctor
 import qualified Data.ByteString           as BS
 import           Data.Serialize
 import           Data.Traversable
 import           Filesystem                hiding (readFile, writeFile)
 import           Filesystem.Path
-import           Filesystem.Path.CurrentOS hiding (encode)
+import           Filesystem.Path.CurrentOS hiding (decode, encode)
 import           Prelude                   hiding (FilePath, sequence)
 import           Safe
 import           SimpleStore.Internal
 import           SimpleStore.Types
 import           System.IO.Error
 import           System.Posix.Process
-import Control.Concurrent.STM
 
 ableToBreakLock :: FilePath -> IO (Either StoreError FilePath)
 ableToBreakLock fp = do
@@ -71,3 +72,20 @@ catchStoreError e
   | isDoesNotExistError e = StoreFileNotFound
   | isPermissionError e = StoreFileNotFound
   | otherwise = StoreIOError . show $ e
+
+openNewestStore :: (a -> IO (Either StoreError b)) -> [a] -> IO (Either StoreError b)
+openNewestStore _ [] = return . Left $ StoreFileNotFound
+openNewestStore f (x:xs) = do
+  res <- catch (f x) (hIOException f xs)
+  case res of
+    (Left _) -> openNewestStore f xs
+    r@(Right _) -> return r
+  where  hIOException :: (a -> IO (Either StoreError b)) -> [a] -> IOException -> IO (Either StoreError b)
+         hIOException func ys _ = openNewestStore func ys
+
+createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
+createStoreFromFilePath fp = do
+  let eVersion = getVersionNumber . filename $ fp
+  fHandle <- openFile fp ReadWriteMode
+  fConts <- BS.hGetContents fHandle
+  sequence $ first (StoreIOError . show) $ (createStore fp fHandle) <$> eVersion <*> decode fConts
