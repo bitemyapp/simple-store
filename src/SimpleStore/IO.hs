@@ -58,3 +58,6 @@ closeSimpleStore store = undefined
 
 modifySimpleStore :: SimpleStore st -> (st -> IO st) -> IO (Either StoreError ())
 modifySimpleStore store func = undefined
+
+
+createCheckpointSimpleStore
