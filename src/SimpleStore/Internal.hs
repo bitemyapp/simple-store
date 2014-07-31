@@ -1,18 +1,34 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module SimpleStore.Internal (
     putWriteStore
   , obtainLock
   , releaseLock
   , withLock
   , processExists
+  , getVersionNumber
+  , createStore
+  , isState
 ) where
 
+import           Control.Applicative
 import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent.STM.TVar
+import           Control.Exception
+import           Control.Monad
 import           Control.Monad.STM
+import           Data.Bifunctor
+import           Data.Text
+import           Data.Text.Read
+import           Filesystem.Path
+import           Filesystem.Path.CurrentOS
+import           Prelude                      hiding (FilePath)
 import           SimpleStore.Types
-import Control.Exception
-import System.Posix.Process
-import System.Posix.Types
+import           System.Posix.Process
+import           System.Posix.Types
+import           System.IO                    (Handle)
+
 
 
 putWriteStore :: SimpleStore st -> st -> IO ()
@@ -39,3 +55,20 @@ processExists s = catch (getProcessPriority (CPid . fromIntegral $ s) >> return 
   where
     handleNotFound :: IOException -> IO Bool
     handleNotFound _ = return False
+
+getVersionNumber :: FilePath -> Either String Int
+getVersionNumber fp = second fst $ join $ decimal <$> eTextFp
+  where eTextFp = first unpack $ toText fp
+
+
+createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
+createStore fp fHandle version st = do
+  sState <- newTVarIO st
+  sLock <- newTMVarIO StoreLock
+  sHandle <- newTVarIO fHandle
+  return $ SimpleStore fp sState sLock sHandle version
+
+isState :: FilePath -> Bool
+isState fp = case extension fp of
+              (Just ext) -> if ext == "st" then True else False
+              Nothing -> False

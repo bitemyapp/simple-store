@@ -5,6 +5,7 @@ module SimpleStore.IO where
 import           Control.Applicative
 import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent.STM.TVar
+import           Control.Monad                hiding (sequence)
 import           Control.Monad.STM
 import           Data.Bifunctor
 import qualified Data.ByteString              as BS
@@ -14,6 +15,7 @@ import           Data.Serialize
 import qualified Data.Serialize               as S
 import           Data.Text                    hiding (filter, map, maximum,
                                                stripPrefix)
+import           Data.Text.Read
 import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
@@ -47,25 +49,14 @@ openSimpleStore dir = do
       print modifiedDates
       case maximumMay modifiedDates of
         (Just (_, lastFile)) -> do
-          let version = filename lastFile
+          let eVersion = getVersionNumber . filename $ lastFile
           fHandle <- openFile lastFile ReadWriteMode
           fConts <- BS.hGetContents fHandle
           let dec = decode fConts
-          sequence $ first (StoreIOError . show) $  (createStore lastFile fHandle 0) <$> dec
+          sequence $ first (StoreIOError . show) $  (createStore lastFile fHandle) <$> eVersion <*> dec
         Nothing -> return . Left $ StoreCheckpointNotFound
     else return . Left $ StoreFolderNotFound
 
-createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
-createStore fp handle version st = do
-  sState <- newTVarIO st
-  sLock <- newTMVarIO StoreLock
-  sHandle <- newTVarIO handle
-  return $ SimpleStore fp sState sLock sHandle version
-
-isState :: FilePath -> Bool
-isState fp = case extension fp of
-              (Just ext) -> if ext == "st" then True else False
-              Nothing -> False
 
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 makeSimpleStore dir state = do
@@ -74,7 +65,7 @@ makeSimpleStore dir state = do
   st <- newTVarIO state
   lock <- newTMVarIO StoreLock
   let encodedState = S.encode state
-  let checkpointPath = fp </> (fromText . pack $ "checkpoint" ++ (show initialVersion) ++ ".st")
+  let checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ "checkpoint.st")
   writeFile checkpointPath encodedState
   handle <- openFile checkpointPath AppendMode
   tHandle <- newTVarIO handle
