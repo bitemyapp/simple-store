@@ -83,34 +83,6 @@ createStoreFromFilePath fp = do
   fHandle <- openFile fp ReadWriteMode
   fConts <- BS.hGetContents fHandle
   sequence $ first (StoreIOError . show) $ (createStore fp fHandle) <$> eVersion <*> decode fConts
-         --runStore file = do
-         --  let eVersion = getVersionNumber . filename $ file
-         --  fHandle <- openFile file ReadWriteMode
-         --  fConts <- BS.hGetContents fHandle
-         --  sequence $ first (StoreIOError . show) $ (createStore file fHandle) <$> eVersion <*> decode fConts
-  --ioR <- foldl (fFunc f) (return Nothing) xs
-  --case ioR of
-  --  Nothing -> return . Left $ StoreFileNotFound
-  --  Just res -> res
-  --where fFunc :: (a -> IO (Either StoreError b)) -> IO (Maybe (IO (Either StoreError b))) -> a -> IO (Maybe (IO (Either StoreError b)))
-  --      fFunc fu ioM ioRes =  ioM >>= (matchJust fu ioRes)
-  --      matchJust :: (a -> IO b) -> a -> Maybe (IO b) -> IO (Maybe (IO b))
-  --      matchJust fu ioRes j@(Just _) = return j
-  --      matchJust fu ioRes Nothing = catchIOThing fu ioRes
-  --      hIOException :: IOException -> IO (Maybe a)
-  --      hIOException _ = return Nothing
-  --      catchIOThing :: (a -> IO b) -> a -> IO (Maybe (IO b))
-  --      catchIOThing fu ioR = catch (do
-  --                          res <- fu ioR
-  --                          return (Just . return $  res)) hIOException
-  --catch (runStore file xs) (hIOException xs)
-  --where  hIOException :: [(UTCTime, FilePath)] -> IOException -> IO (Either StoreError (SimpleStore st))
-  --       hIOException xs _ = openNewestStore xs
-  --       runStore file = do
-  --         let eVersion = getVersionNumber . filename $ file
-  --         fHandle <- openFile file ReadWriteMode
-  --         fConts <- BS.hGetContents fHandle
-  --         sequence $ first (StoreIOError . show) $ (createStore file fHandle) <$> eVersion <*> decode fConts
 
 
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
