@@ -95,7 +95,14 @@ modifySimpleStore store func = withLock store $ do
   Right <$> (atomically $ writeTVar tState res)
   where tState = storeState store
 
---createCheckpoint :: SimpleStore st -> IO (Either StoreError ())
---createCheckpoint store = withLock store $ do
---  fp <- directory <$> (atomically . readTVar . storeFP $ store)
-  
+createCheckpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
+createCheckpoint store = withLock store $ do
+  fp <- directory <$> (readTVarIO . storeFP $ store)
+  state <- readTVarIO tState
+  newVersion <- (+1) <$> (readTVarIO tVersion)
+  atomically $ writeTVar tVersion newVersion
+  let encodedState = S.encode state
+      checkpointPath = fp </> (fromText . pack $ (show newVersion) ++ "checkpoint.st")
+  return . Right $ ()
+  where tState = storeState store
+        tVersion = storeCheckpointVersion store
