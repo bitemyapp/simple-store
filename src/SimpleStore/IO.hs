@@ -169,4 +169,3 @@ createCheckpoint store = withLock store $ do
             writeTVar tVersion version
             takeTMVar tHandle >> putTMVar tHandle fHandle
           return . Right $ ()
-
