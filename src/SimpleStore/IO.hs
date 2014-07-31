@@ -5,17 +5,22 @@ module SimpleStore.IO where
 import           Control.Applicative
 import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent.STM.TVar
+import           Control.Exception
 import           Control.Monad                hiding (sequence)
 import           Control.Monad.STM
 import           Data.Bifunctor
 import qualified Data.ByteString              as BS
+import           Data.Function
+import           Data.List
 import           Data.Maybe                   (Maybe)
 import           Data.Maybe
 import           Data.Serialize
+import           Data.Serialize
 import qualified Data.Serialize               as S
-import           Data.Text                    hiding (filter, map, maximum,
-                                               stripPrefix)
+import           Data.Text                    hiding (filter, foldl, map,
+                                               maximum, stripPrefix)
 import           Data.Text.Read
+import           Data.Time.Clock
 import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
@@ -43,19 +48,69 @@ openSimpleStore dir = do
       print dirContents
       let files = filter isState dirContents
       print files
-      modifiedDates <- traverse (\file -> do
-                                    t <- getModified file
-                                    return (t,file)) files
+      modifiedDates <- traverse (\file -> do                -- Lambda is because the instance for Traversable on ()
+                                    t <- getModified file   -- Traverses the second item so sequence only evaluates
+                                    return (t,file)) files  -- the second item
       print modifiedDates
+      let sortedDates = sortBy (compare `on` snd) modifiedDates
+
       case maximumMay modifiedDates of
-        (Just (_, lastFile)) -> do
-          let eVersion = getVersionNumber . filename $ lastFile
-          fHandle <- openFile lastFile ReadWriteMode
-          fConts <- BS.hGetContents fHandle
-          let dec = decode fConts
-          sequence $ first (StoreIOError . show) $  (createStore lastFile fHandle) <$> eVersion <*> dec
+        (Just (_, fp)) -> do
+
+          --createStoreFromFilePath :: FilePath -> IO (Either StoreError (SimpleStore st))
+          --createStoreFromFilePath fp = do
+            let eVersion = getVersionNumber . filename $ fp
+            fHandle <- openFile fp ReadWriteMode
+            fConts <- BS.hGetContents fHandle
+            let dec = decode fConts
+            sequence $ first (StoreIOError . show) $  (createStore fp fHandle) <$> eVersion <*> dec
         Nothing -> return . Left $ StoreCheckpointNotFound
     else return . Left $ StoreFolderNotFound
+
+openNewestStore :: (a -> IO (Either StoreError b)) -> [a] -> IO (Either StoreError b)
+openNewestStore _ [] = return . Left $ StoreFileNotFound
+openNewestStore f (x:xs) = do
+  res <- catch (f x) (hIOException f xs)
+  case res of
+    (Left _) -> openNewestStore f xs
+    r@(Right _) -> return r
+  where  hIOException :: (a -> IO (Either StoreError b)) -> [a] -> IOException -> IO (Either StoreError b)
+         hIOException func ys _ = openNewestStore func ys
+
+createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
+createStoreFromFilePath fp = do
+  let eVersion = getVersionNumber . filename $ fp
+  fHandle <- openFile fp ReadWriteMode
+  fConts <- BS.hGetContents fHandle
+  sequence $ first (StoreIOError . show) $ (createStore fp fHandle) <$> eVersion <*> decode fConts
+         --runStore file = do
+         --  let eVersion = getVersionNumber . filename $ file
+         --  fHandle <- openFile file ReadWriteMode
+         --  fConts <- BS.hGetContents fHandle
+         --  sequence $ first (StoreIOError . show) $ (createStore file fHandle) <$> eVersion <*> decode fConts
+  --ioR <- foldl (fFunc f) (return Nothing) xs
+  --case ioR of
+  --  Nothing -> return . Left $ StoreFileNotFound
+  --  Just res -> res
+  --where fFunc :: (a -> IO (Either StoreError b)) -> IO (Maybe (IO (Either StoreError b))) -> a -> IO (Maybe (IO (Either StoreError b)))
+  --      fFunc fu ioM ioRes =  ioM >>= (matchJust fu ioRes)
+  --      matchJust :: (a -> IO b) -> a -> Maybe (IO b) -> IO (Maybe (IO b))
+  --      matchJust fu ioRes j@(Just _) = return j
+  --      matchJust fu ioRes Nothing = catchIOThing fu ioRes
+  --      hIOException :: IOException -> IO (Maybe a)
+  --      hIOException _ = return Nothing
+  --      catchIOThing :: (a -> IO b) -> a -> IO (Maybe (IO b))
+  --      catchIOThing fu ioR = catch (do
+  --                          res <- fu ioR
+  --                          return (Just . return $  res)) hIOException
+  --catch (runStore file xs) (hIOException xs)
+  --where  hIOException :: [(UTCTime, FilePath)] -> IOException -> IO (Either StoreError (SimpleStore st))
+  --       hIOException xs _ = openNewestStore xs
+  --       runStore file = do
+  --         let eVersion = getVersionNumber . filename $ file
+  --         fHandle <- openFile file ReadWriteMode
+  --         fConts <- BS.hGetContents fHandle
+  --         sequence $ first (StoreIOError . show) $ (createStore file fHandle) <$> eVersion <*> decode fConts
 
 
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
@@ -100,9 +155,18 @@ createCheckpoint store = withLock store $ do
   fp <- directory <$> (readTVarIO . storeFP $ store)
   state <- readTVarIO tState
   newVersion <- (+1) <$> (readTVarIO tVersion)
-  atomically $ writeTVar tVersion newVersion
   let encodedState = S.encode state
       checkpointPath = fp </> (fromText . pack $ (show newVersion) ++ "checkpoint.st")
-  return . Right $ ()
+  newHandle <- openFile checkpointPath ReadWriteMode
+  eFileRes <- catch (Right <$> writeFile checkpointPath encodedState) (return . Left . catchStoreError)
+  updateIfWritten eFileRes newVersion newHandle
   where tState = storeState store
         tVersion = storeCheckpointVersion store
+        tHandle = storeHandle store
+        updateIfWritten l@(Left _) _ _= return l
+        updateIfWritten _ version fHandle = do
+          atomically $ do
+            writeTVar tVersion version
+            takeTMVar tHandle >> putTMVar tHandle fHandle
+          return . Right $ ()
+

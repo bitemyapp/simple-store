@@ -79,5 +79,5 @@ isState fp = case extension fp of
 
 closeStoreHandle :: SimpleStore st -> IO ()
 closeStoreHandle store = do
-  mHandle <- atomically . tryTakeTMVar . storeHandle $ store
-  void . sequence $ hClose <$> mHandle
+  fHandle <- atomically . readTMVar . storeHandle $ store
+  hClose fHandle

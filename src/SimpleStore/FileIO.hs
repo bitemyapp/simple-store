@@ -64,3 +64,10 @@ releaseFileLock store = do
   fp <- (\fp -> directory fp </> (fromText "open.lock")) <$> (atomically . readTVar . storeFP $ store)
   exists <- isFile fp
   if exists then removeFile fp else return ()
+
+catchStoreError :: IOError -> StoreError
+catchStoreError e
+  | isAlreadyInUseError e = StoreAlreadyOpen
+  | isDoesNotExistError e = StoreFileNotFound
+  | isPermissionError e = StoreFileNotFound
+  | otherwise = StoreIOError . show $ e
