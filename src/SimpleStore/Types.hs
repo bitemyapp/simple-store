@@ -19,4 +19,4 @@ data SimpleStore st = SimpleStore {
 
 data StoreLock = StoreLock
 
-data StoreError = StoreAlreadyOpen | StoreLocked | StoreIOError String deriving (Show, Eq)
+data StoreError = StoreAlreadyOpen | StoreLocked | StoreFolderNotFound | StoreCheckpointNotFound | StoreIOError String deriving (Show, Eq)

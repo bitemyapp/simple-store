@@ -27,6 +27,7 @@ Library
                       , unix
                       , text
                       , safe
+                      , bifunctors
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0

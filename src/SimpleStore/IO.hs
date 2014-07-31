@@ -1,29 +1,71 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 module SimpleStore.IO where
 
+import           Control.Applicative
 import           Control.Concurrent.STM.TMVar
 import           Control.Concurrent.STM.TVar
 import           Control.Monad.STM
+import           Data.Bifunctor
+import qualified Data.ByteString              as BS
 import           Data.Maybe                   (Maybe)
+import           Data.Maybe
+import           Data.Serialize
+import qualified Data.Serialize               as S
+import           Data.Text                    hiding (filter, map, maximum,
+                                               stripPrefix)
+import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
-import           Prelude                      hiding (FilePath, writeFile)
+import           Filesystem.Path.CurrentOS    hiding (decode)
+import           Prelude                      hiding (FilePath, sequence,
+                                               writeFile)
+import           Safe
+import           SimpleStore.FileIO
+import           SimpleStore.Internal
 import           SimpleStore.Types
 import           System.IO                    (Handle)
-import Filesystem.Path.CurrentOS
-import Data.Text
-import SimpleStore.FileIO
-import qualified Data.Serialize as S
 
 getSimpleStore :: SimpleStore st -> IO st
 getSimpleStore store = atomically . readTVar . storeState $ store
 
 putSimpleStore :: SimpleStore st -> st -> IO ()
-putSimpleStore store state = atomically . (writeTVar tState) $ state
-  where tState = storeState store
+putSimpleStore store state = withLock store $ putWriteStore store state
 
-openSimpleStore :: FilePath -> IO (Either StoreError (SimpleStore st))
-openSimpleStore dir = undefined
+openSimpleStore :: (S.Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
+openSimpleStore dir = do
+  exists <- isDirectory dir
+  if exists
+    then do
+      dirContents <- listDirectory dir
+      print dirContents
+      let files = filter isState dirContents
+      print files
+      modifiedDates <- traverse (\file -> do
+                                    t <- getModified file
+                                    return (t,file)) files
+      print modifiedDates
+      case maximumMay modifiedDates of
+        (Just (_, lastFile)) -> do
+          let version = filename lastFile
+          fHandle <- openFile lastFile ReadWriteMode
+          fConts <- BS.hGetContents fHandle
+          let dec = decode fConts
+          sequence $ first (StoreIOError . show) $  (createStore lastFile fHandle 0) <$> dec
+        Nothing -> return . Left $ StoreCheckpointNotFound
+    else return . Left $ StoreFolderNotFound
+
+createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
+createStore fp handle version st = do
+  sState <- newTVarIO st
+  sLock <- newTMVarIO StoreLock
+  sHandle <- newTVarIO handle
+  return $ SimpleStore fp sState sLock sHandle version
+
+isState :: FilePath -> Bool
+isState fp = case extension fp of
+              (Just ext) -> if ext == "st" then True else False
+              Nothing -> False
 
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 makeSimpleStore dir state = do
@@ -38,7 +80,7 @@ makeSimpleStore dir state = do
   tHandle <- newTVarIO handle
   return . Right $ SimpleStore fp st lock tHandle initialVersion
   where initialVersion = 0
-  
+
 
 initializeDirectory :: FilePath -> IO FilePath
 initializeDirectory dir = do
@@ -58,3 +100,6 @@ closeSimpleStore store = undefined
 
 modifySimpleStore :: SimpleStore st -> (st -> IO st) -> IO (Either StoreError ())
 modifySimpleStore store func = undefined
+
+createCheckpoint :: SimpleStore st -> IO (Either StoreError ())
+createCheckpoint store = undefined
