@@ -131,11 +131,18 @@ checkpoint store = do
 -- If the folder already exists it deletes it and creates a new directory
 initializeDirectory :: FilePath -> IO FilePath
 initializeDirectory dir = do
-  workingDir <- getWorkingDirectory
-  let fp = workingDir </> dir
+  fp <- makeAbsoluteFp dir
   exists <- isDirectory fp
   if exists
     then removeTree fp
     else return ()
   createDirectory True fp
   return fp
+
+makeAbsoluteFp :: FilePath -> IO FilePath
+makeAbsoluteFp fp = do
+  if absolute fp
+    then return fp
+    else do
+      base <- getWorkingDirectory
+      return $ base </> fp

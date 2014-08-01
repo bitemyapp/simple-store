@@ -68,7 +68,7 @@ spec = do
       let initial = 0 :: Int
           modifyX = (+2)
           dir = "test-states"
-          functions = replicate 100  (\tv x -> (atomically $ readTMVar tv) >> (print x) >> (return . modifyX $ x))
+          functions = replicate 100  (\tv x -> (atomically $ readTMVar tv) >> (return . modifyX $ x))
       waitTVar <- newEmptyTMVarIO
       (Right store) <- makeSimpleStore dir initial
       createCheckpoint store
@@ -81,7 +81,8 @@ spec = do
       putStrLn $ "x -> " ++ (show x'')
       createCheckpoint store
       closeSimpleStore store
-      (Right store') <- openSimpleStore dir
+      eStore <- openSimpleStore dir
+      let store' = either (error . show) id eStore
       x' <- getSimpleStore store'
       x' `shouldBe` (200 :: Int)
 

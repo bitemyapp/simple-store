@@ -33,7 +33,7 @@ putSimpleStore store state = withLock store $ putWriteStore store state
 -- | Open a simple store from a filepath reading in the newest most valid store
 openSimpleStore :: (S.Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
 openSimpleStore fp = do
-  dir <- (</> fp) <$> getWorkingDirectory
+  dir <- makeAbsoluteFp fp
   exists <- isDirectory dir
   if exists
     then do
