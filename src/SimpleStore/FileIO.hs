@@ -106,7 +106,7 @@ checkpoint store = do
   fp <- (readTVarIO . storeDir $ store)
   state <- readTVarIO tState
   oldVersion <- readTVarIO tVersion
-  let newVersion = (oldVersion + 1) `mod` 300
+  let newVersion = (oldVersion + 1) `mod` 5
       encodedState = encode state
       oldCheckpointPath = fp </> (fromText . pack $ (show oldVersion) ++ "checkpoint.st")
       checkpointPath = fp </> (fromText . pack $ (show newVersion) ++ "checkpoint.st")
