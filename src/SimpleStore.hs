@@ -1,14 +1,4 @@
-module SimpleStore (
-    getSimpleStore
-  , putSimpleStore
-  , openSimpleStore
-  , makeSimpleStore
-  , closeSimpleStore
-  , modifySimpleStore
-  , SimpleStore
-  , StoreError(..)
-  , createCheckpoint
-) where
+module SimpleStore (module SimpleStore) where
 
-import           SimpleStore.IO
-import           SimpleStore.Types
+import           SimpleStore.IO as SimpleStore (getSimpleStore, putSimpleStore, openSimpleStore, makeSimpleStore, closeSimpleStore, modifySimpleStore, createCheckpoint)
+import           SimpleStore.Types as SimpleStore (SimpleStore, StoreError(..)) 
