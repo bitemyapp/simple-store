@@ -20,6 +20,7 @@ import           Prelude                      hiding (FilePath, sequence,
 import           SimpleStore.FileIO
 import           SimpleStore.Internal
 import           SimpleStore.Types
+import Data.Either
 
 -- | Get the current value of the store
 getSimpleStore :: SimpleStore st -> IO st
@@ -36,17 +37,21 @@ openSimpleStore fp = do
   exists <- isDirectory dir
   if exists
     then do
-      dirContents <- listDirectory dir
-      print dirContents
-      let files = filter isState dirContents
-      print files
-      modifiedDates <- traverse (\file -> do                -- Lambda is because the instance for Traversable on ()
-                                    t <- getModified file   -- Traverses the second item so sequence only evaluates
-                                    return (t,file)) files  -- the second item
-      print modifiedDates
-      let sortedDates = snd <$> sortBy (compare `on` snd) modifiedDates
-      print sortedDates
-      openNewestStore createStoreFromFilePath sortedDates
+      lock <- attemptTakeLock fp
+      if isRight lock
+      then do
+        dirContents <- listDirectory dir
+        print dirContents
+        let files = filter isState dirContents
+        print files
+        modifiedDates <- traverse (\file -> do                -- Lambda is because the instance for Traversable on ()
+                                      t <- getModified file   -- Traverses the second item so sequence only evaluates
+                                      return (t,file)) files  -- the second item
+        print modifiedDates
+        let sortedDates = snd <$> sortBy (compare `on` snd) modifiedDates
+        print sortedDates
+        openNewestStore createStoreFromFilePath sortedDates
+      else return . Left $ StoreLocked
     else return . Left $ StoreFolderNotFound
 
 -- | Initialize a simple store from a given filepath and state.
