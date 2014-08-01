@@ -21,13 +21,15 @@ import           SimpleStore.FileIO
 import           SimpleStore.Internal
 import           SimpleStore.Types
 
--- | Get the va
+-- | Get the current value of the store
 getSimpleStore :: SimpleStore st -> IO st
 getSimpleStore store = atomically . readTVar . storeState $ store
 
+-- | Put a new value into a simple store with the lock
 putSimpleStore :: SimpleStore st -> st -> IO ()
 putSimpleStore store state = withLock store $ putWriteStore store state
 
+-- | Open a simple store from a filepath reading in the newest most valid store
 openSimpleStore :: (S.Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
 openSimpleStore fp = do
   dir <- (</> fp) <$> getWorkingDirectory
@@ -47,6 +49,9 @@ openSimpleStore fp = do
       openNewestStore createStoreFromFilePath sortedDates
     else return . Left $ StoreFolderNotFound
 
+-- | Initialize a simple store from a given filepath and state.
+-- The filepath should just be to the directory you want the state created in
+-- as in "state"
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 makeSimpleStore dir state = do
   fp <- initializeDirectory dir
@@ -58,25 +63,16 @@ makeSimpleStore dir state = do
   Right <$> createStore fp handle initialVersion state
 
 
-initializeDirectory :: FilePath -> IO FilePath
-initializeDirectory dir = do
-  workingDir <- getWorkingDirectory
-  let fp = workingDir </> dir
-  exists <- isDirectory fp
-  if exists
-    then removeTree fp
-    else return ()
-  createDirectory True fp
-  return fp
 
-
-
+-- | Release the file lock and close the handle to the file allowing another processes to open
+-- the store
 closeSimpleStore :: SimpleStore st -> IO ()
 closeSimpleStore store = withLock store $ do
   closeStoreHandle store
   releaseFileLock store
 
-
+-- | Run a function against the state and put the result into the state
+-- This does not write the store to disk
 modifySimpleStore :: SimpleStore st -> (st -> IO st) -> IO (Either StoreError ())
 modifySimpleStore store func = withLock store $ do
   state <- readTVarIO tState
@@ -84,5 +80,7 @@ modifySimpleStore store func = withLock store $ do
   Right <$> (atomically $ writeTVar tState res)
   where tState = storeState store
 
+
+-- | Write the current store to disk in the given folder
 createCheckpoint :: (S.Serialize st) => SimpleStore st -> IO (Either StoreError ())
 createCheckpoint store = withLock store $ checkpoint store

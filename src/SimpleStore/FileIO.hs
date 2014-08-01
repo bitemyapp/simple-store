@@ -23,6 +23,7 @@ import           System.IO                 (hClose)
 import           System.IO.Error
 import           System.Posix.Process
 
+-- | Return the given filepath if it is able to break the open.lock file
 ableToBreakLock :: FilePath -> IO (Either StoreError FilePath)
 ableToBreakLock fp = do
   fileExists <- isFile fp
@@ -39,6 +40,7 @@ ableToBreakLock fp = do
         Nothing -> return . Left . StoreIOError $ "Unable to parse open.lock"
     else return $ Right fp
 
+-- | Catch all errors that allow the lock to still be taken
 ableToBreakLockError :: IOError -> Bool
 ableToBreakLockError e
   | isAlreadyInUseError e = False
@@ -55,6 +57,7 @@ createLock fp = do
   where showError :: IOException -> IO (Either StoreError ())
         showError e = return . Left . StoreIOError . show $ e
 
+-- | Attempt to create a lock inside of the given filepath
 attemptTakeLock :: FilePath -> IO (Either StoreError ())
 attemptTakeLock baseFP = do
   let fp = baseFP </> (fromText "open.lock")
@@ -62,12 +65,14 @@ attemptTakeLock baseFP = do
   res <- sequence $ createLock <$> allowBreak
   return . join $ res
 
+-- | release the lock for a given store
 releaseFileLock :: SimpleStore st -> IO ()
 releaseFileLock store = do
   fp <- (\fp -> fp </> (fromText "open.lock")) <$> (atomically . readTVar . storeDir $ store)
   exists <- isFile fp
   if exists then removeFile fp else return ()
 
+-- Catch errors for storing so they aren't thrown
 catchStoreError :: IOError -> StoreError
 catchStoreError e
   | isAlreadyInUseError e = StoreAlreadyOpen
@@ -75,6 +80,7 @@ catchStoreError e
   | isPermissionError e = StoreFileNotFound
   | otherwise = StoreIOError . show $ e
 
+-- | Opens the newest store that doesn't throw an exception or give a StoreError back as a result
 openNewestStore :: (a -> IO (Either StoreError b)) -> [a] -> IO (Either StoreError b)
 openNewestStore _ [] = return . Left $ StoreFileNotFound
 openNewestStore f (x:xs) = do
@@ -85,6 +91,7 @@ openNewestStore f (x:xs) = do
   where  hIOException :: (a -> IO (Either StoreError b)) -> [a] -> IOException -> IO (Either StoreError b)
          hIOException func ys _e = openNewestStore func ys
 
+-- Attempt to open a store from a filepath
 createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
 createStoreFromFilePath fp = do
   let eVersion = getVersionNumber . filename $ fp
@@ -92,6 +99,8 @@ createStoreFromFilePath fp = do
   fConts <- BS.hGetContents fHandle
   sequence $ first (StoreIOError . show) $ (createStore (directory fp) fHandle) <$> eVersion <*> decode fConts
 
+-- | Create a checkpoint for a store. This attempts to write the error to disk
+-- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
 checkpoint store = do
   fp <- (readTVarIO . storeDir $ store)
@@ -117,3 +126,16 @@ checkpoint store = do
             return oldHandle
           hClose oHandle
           return . Right $ ()
+
+-- Initialize a directory by adding the working directory and checking if it already exists.
+-- If the folder already exists it deletes it and creates a new directory
+initializeDirectory :: FilePath -> IO FilePath
+initializeDirectory dir = do
+  workingDir <- getWorkingDirectory
+  let fp = workingDir </> dir
+  exists <- isDirectory fp
+  if exists
+    then removeTree fp
+    else return ()
+  createDirectory True fp
+  return fp

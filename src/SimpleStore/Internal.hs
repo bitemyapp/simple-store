@@ -44,23 +44,27 @@ obtainLock store = atomically . takeTMVar . storeLock $ store
 releaseLock :: SimpleStore st -> IO ()
 releaseLock store = atomically $ putTMVar (storeLock store) StoreLock
 
+-- | Run an IO function inside of a simple store lock
+-- This is a cheap version of a transaction
 withLock :: SimpleStore st -> IO b -> IO b
 withLock store func = do
   void $ obtainLock store
   res <- finally (func) (releaseLock store)
   return res
 
+-- | Check if a process exists
 processExists :: Int -> IO Bool
 processExists s = catch (getProcessPriority (CPid . fromIntegral $ s) >> return True) handleNotFound
   where
     handleNotFound :: IOException -> IO Bool
     handleNotFound _ = return False
 
+-- Get the version number of a file from the filepath
 getVersionNumber :: FilePath -> Either String Int
 getVersionNumber fp = second fst $ join $ decimal <$> eTextFp
   where eTextFp = first unpack $ toText fp
 
-
+-- Create a store from it's members. Just creates the necessary TMVars/TVars
 createStore :: FilePath -> Handle -> Int -> st -> IO (SimpleStore st)
 createStore fp fHandle version st = do
   sState <- newTVarIO st
@@ -70,11 +74,13 @@ createStore fp fHandle version st = do
   sFp <- newTVarIO fp
   return $ SimpleStore sFp sState sLock sHandle sVersion
 
+-- Checks the extension of a filepath for ".st"
 isState :: FilePath -> Bool
 isState fp = case extension fp of
               (Just ext) -> if ext == "st" then True else False
               Nothing -> False
 
+-- Release the handle for a simplestore state file
 closeStoreHandle :: SimpleStore st -> IO ()
 closeStoreHandle store = do
   fHandle <- atomically . readTMVar . storeHandle $ store
