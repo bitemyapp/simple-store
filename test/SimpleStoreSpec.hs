@@ -3,6 +3,7 @@
 module SimpleStoreSpec (main, spec) where
 
 import           Control.Applicative
+import           Data.Either
 import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
@@ -19,6 +20,7 @@ spec = do
     it "should open an initial state, create checkpoints, and then open the state back up" $ do
       let x = 10 :: Int
           dir = "test-states"
+      workingDir <- getWorkingDirectory
       eStore <- makeSimpleStore dir x
       sequence $ getSimpleStore <$> eStore
       sequence $ createCheckpoint <$> eStore
@@ -33,22 +35,26 @@ spec = do
         (Left err) -> fail "Unable to open local state"
         (Right store) -> do
           x' <- getSimpleStore store
+          removeTree $ workingDir </> dir
           x `shouldBe` x'
   describe "Make, close, open, modify, close open, check value" $ do
     it "Should create a new state, close it, then open the state and modify the state, close the state, and finally open it and check the value" $ do
       let initial = 100 :: Int
+          modifyX x = x + 1000
           dir = "test-states"
-      eStore <- makeSimpleStore dir initial
-      sequence $ createCheckpoint <$> eStore
-      sequence $ closeSimpleStore <$> eStore
-      eStore' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))
-      sequence $ createCheckpoint <$> eStore'
-      sequence $ (\store -> modifySimpleStore store (\x -> return $ x+1)) <$> eStore'
-      sequence $ createCheckpoint <$> eStore'
-      sequence $ closeSimpleStore <$> eStore'
-      eStore'' <- openSimpleStore dir
+      workingDir <- getWorkingDirectory
+      (Right store) <- makeSimpleStore dir initial
+      createCheckpoint store
+      closeSimpleStore store
+      (Right store') <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))
+      createCheckpoint store'
+      (\store -> modifySimpleStore store (return . modifyX)) store'
+      createCheckpoint store'
+      closeSimpleStore store'
+      eStore'' <- openSimpleStore dir :: IO (Either StoreError (SimpleStore Int))
       case eStore'' of
         (Left err) -> fail "Unable to open local state"
         (Right store) -> do
-          x' <- getSimpleStore store
-          x' `shouldBe` initial
+          x' <- getSimpleStore store'
+          removeTree $ workingDir </> dir
+          x' `shouldBe` (modifyX initial)
