@@ -41,10 +41,11 @@ putSimpleStore store state = withLock store $ putWriteStore store state
 
 openSimpleStore :: (S.Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
 openSimpleStore dir = do
+  workDir <- getWorkingDirectory
   exists <- isDirectory dir
   if exists
     then do
-      dirContents <- listDirectory dir
+      dirContents <- listDirectory $ workDir </> dir
       print dirContents
       let files = filter isState dirContents
       print files
@@ -96,7 +97,7 @@ modifySimpleStore store func = withLock store $ do
 
 createCheckpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
 createCheckpoint store = withLock store $ do
-  fp <- readTVarIO . storeFP $ store
+  fp <- directory <$> (readTVarIO . storeFP $ store)
   state <- readTVarIO tState
   oldVersion <- readTVarIO tVersion
   let newVersion = (oldVersion + 1) `mod` 10
