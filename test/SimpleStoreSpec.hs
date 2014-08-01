@@ -3,11 +3,16 @@
 module SimpleStoreSpec (main, spec) where
 
 import           Control.Applicative
+import           Control.Concurrent
+import           Control.Concurrent.Async
+import           Control.Concurrent.STM
+import           Control.Concurrent.STM.TMVar
 import           Data.Either
+import           Data.Traversable
 import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
-import           Prelude             hiding (sequence)
+import           Prelude                      hiding (sequence)
 import           SimpleStore
 import           Test.Hspec
 
@@ -58,3 +63,25 @@ spec = do
           x' <- getSimpleStore store'
           removeTree $ workingDir </> dir
           x' `shouldBe` (modifyX initial)
+  describe "Async updating/creating checkpoints for a state" $ do
+    it "Should start 100 threads trying to update a state and should modify the state correctly, be able to close and reopen the state, and then read the correct value" $ do
+      let initial = 0 :: Int
+          modifyX = (+2)
+          dir = "test-states"
+          functions = replicate 100  (\tv x -> (atomically $ readTMVar tv) >> (print x) >> (return . modifyX $ x))
+      waitTVar <- newEmptyTMVarIO
+      (Right store) <- makeSimpleStore dir initial
+      createCheckpoint store
+      aRes <- traverse (\func -> async $ do
+                          modifySimpleStore store (func waitTVar)
+                          createCheckpoint store) functions
+      atomically $ putTMVar waitTVar ()
+      results <- traverse wait aRes
+      x'' <- getSimpleStore store
+      putStrLn $ "x -> " ++ (show x'')
+      createCheckpoint store
+      closeSimpleStore store
+      (Right store') <- openSimpleStore dir
+      x' <- getSimpleStore store'
+      x' `shouldBe` (200 :: Int)
+

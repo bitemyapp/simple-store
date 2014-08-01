@@ -10,6 +10,7 @@ import           Control.Monad             hiding (sequence)
 import           Data.Bifunctor
 import qualified Data.ByteString           as BS
 import           Data.Serialize
+import           Data.Text
 import           Data.Traversable
 import           Filesystem                hiding (readFile, writeFile)
 import           Filesystem.Path
@@ -18,6 +19,7 @@ import           Prelude                   hiding (FilePath, sequence)
 import           Safe
 import           SimpleStore.Internal
 import           SimpleStore.Types
+import           System.IO                 (hClose)
 import           System.IO.Error
 import           System.Posix.Process
 
@@ -62,7 +64,7 @@ attemptTakeLock baseFP = do
 
 releaseFileLock :: SimpleStore st -> IO ()
 releaseFileLock store = do
-  fp <- (\fp -> directory fp </> (fromText "open.lock")) <$> (atomically . readTVar . storeFP $ store)
+  fp <- (\fp -> fp </> (fromText "open.lock")) <$> (atomically . readTVar . storeDir $ store)
   exists <- isFile fp
   if exists then removeFile fp else return ()
 
@@ -81,11 +83,37 @@ openNewestStore f (x:xs) = do
     (Left _) -> openNewestStore f xs
     r@(Right _) -> return r
   where  hIOException :: (a -> IO (Either StoreError b)) -> [a] -> IOException -> IO (Either StoreError b)
-         hIOException func ys e = openNewestStore func ys
+         hIOException func ys _e = openNewestStore func ys
 
 createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
 createStoreFromFilePath fp = do
   let eVersion = getVersionNumber . filename $ fp
   fHandle <- openFile fp ReadWriteMode
   fConts <- BS.hGetContents fHandle
-  sequence $ first (StoreIOError . show) $ (createStore fp fHandle) <$> eVersion <*> decode fConts
+  sequence $ first (StoreIOError . show) $ (createStore (directory fp) fHandle) <$> eVersion <*> decode fConts
+
+checkpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
+checkpoint store = do
+  fp <- (readTVarIO . storeDir $ store)
+  state <- readTVarIO tState
+  oldVersion <- readTVarIO tVersion
+  let newVersion = (oldVersion + 1) `mod` 300
+      encodedState = encode state
+      oldCheckpointPath = fp </> (fromText . pack $ (show oldVersion) ++ "checkpoint.st")
+      checkpointPath = fp </> (fromText . pack $ (show newVersion) ++ "checkpoint.st")
+  newHandle <- openFile checkpointPath ReadWriteMode
+  eFileRes <- catch (Right <$> BS.hPut newHandle encodedState) (return . Left . catchStoreError)
+  updateIfWritten oldCheckpointPath eFileRes newVersion newHandle
+  where tState = storeState store
+        tVersion = storeCheckpointVersion store
+        tHandle = storeHandle store
+        updateIfWritten _ l@(Left _) _ _= return l
+        updateIfWritten old _ version fHandle = do
+          removeFile old
+          oHandle <- atomically $ do
+            writeTVar tVersion version
+            oldHandle <- takeTMVar tHandle
+            putTMVar tHandle fHandle
+            return oldHandle
+          hClose oHandle
+          return . Right $ ()

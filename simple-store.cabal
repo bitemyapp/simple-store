@@ -49,6 +49,7 @@ Test-Suite spec
                       , safe
                       , bifunctors
                       , time
+                      , async
 
 Source-Repository head
   Type:                 git

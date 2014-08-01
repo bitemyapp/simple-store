@@ -25,7 +25,6 @@ import           Data.Text.Read
 import           Filesystem.Path
 import           Filesystem.Path.CurrentOS
 import           Prelude                      hiding (FilePath, sequence)
-import           Data.Traversable
 import           SimpleStore.Types
 import           System.Posix.Process
 import           System.Posix.Types
@@ -47,7 +46,7 @@ releaseLock store = atomically $ putTMVar (storeLock store) StoreLock
 
 withLock :: SimpleStore st -> IO b -> IO b
 withLock store func = do
-  obtainLock store
+  void $ obtainLock store
   res <- finally (func) (releaseLock store)
   return res
 
