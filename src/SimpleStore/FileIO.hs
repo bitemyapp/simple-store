@@ -94,8 +94,8 @@ openNewestStore _ [] = return . Left $ StoreFileNotFound
 openNewestStore f (x:xs) = do
   res <- catch (f x) (hIOException f xs)
   case res of
-    (Left _) -> openNewestStore f xs
-    r@(Right _) -> return r
+    Left _ -> openNewestStore f xs
+    _ -> return res
   where  hIOException :: (a -> IO (Either StoreError b)) -> [a] -> IOException -> IO (Either StoreError b)
          hIOException func ys _e = openNewestStore func ys
 
