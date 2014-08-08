@@ -76,7 +76,7 @@ attemptTakeLock baseFP = do
 -- | release the lock for a given store
 releaseFileLock :: SimpleStore st -> IO ()
 releaseFileLock store = do
-  fp <- (\fp -> fp </> (fromText "open.lock")) <$> (atomically . readTVar . storeDir $ store)
+  fp <- (</> fromText "open.lock") <$> (atomically . readTVar . storeDir $ store)
   exists <- isFile fp
   if exists then removeFile fp else return ()
 
