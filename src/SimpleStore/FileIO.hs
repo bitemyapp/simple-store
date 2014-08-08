@@ -78,7 +78,7 @@ releaseFileLock :: SimpleStore st -> IO ()
 releaseFileLock store = do
   fp <- (</> fromText "open.lock") <$> (atomically . readTVar . storeDir $ store)
   exists <- isFile fp
-  if exists then removeFile fp else return ()
+  when exists $ removeFile fp
 
 -- Catch errors for storing so they aren't thrown
 catchStoreError :: IOError -> StoreError
