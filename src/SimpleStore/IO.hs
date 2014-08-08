@@ -31,28 +31,28 @@ putSimpleStore :: SimpleStore st -> st -> IO ()
 putSimpleStore store state = withLock store $ putWriteStore store state
 
 -- | Open a simple store from a filepath reading in the newest most valid store
-openSimpleStore :: (S.Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
+openSimpleStore :: S.Serialize st => FilePath -> IO (Either StoreError (SimpleStore st))
 openSimpleStore fp = do
   dir <- makeAbsoluteFp fp
   exists <- isDirectory dir
   if exists
-    then do
-      lock <- attemptTakeLock fp
-      if isRight lock
-      then do
-        dirContents <- listDirectory dir
-        print dirContents
-        let files = filter isState dirContents
-        print files
-        modifiedDates <- traverse (\file -> do                -- Lambda is because the instance for Traversable on ()
-                                      t <- getModified file   -- Traverses the second item so sequence only evaluates
-                                      return (t,file)) files  -- the second item
-        print modifiedDates
-        let sortedDates = snd <$> sortBy (compare `on` snd) modifiedDates
-        print sortedDates
-        openNewestStore createStoreFromFilePath sortedDates
-      else return . Left $ StoreLocked
-    else return . Left $ StoreFolderNotFound
+     then do lock <- attemptTakeLock fp
+             if isRight lock
+                then do dirContents <- listDirectory dir
+                        print dirContents
+                        let files = filter isState dirContents
+                        print files
+                        modifiedDates <-
+                           traverse (\file -> do               -- Lambda is because the instance for Traversable on ()
+                                        t <- getModified file  -- Traverses the second item so sequence only evaluates
+                                        return (t,file)        -- the second item
+                                       ) files
+                        print modifiedDates
+                        let sortedDates = snd <$> sortBy (compare `on` snd) modifiedDates
+                        print sortedDates
+                        openNewestStore createStoreFromFilePath sortedDates
+                else return . Left $ StoreLocked
+     else return . Left $ StoreFolderNotFound
 
 -- | Initialize a simple store from a given filepath and state.
 -- The filepath should just be to the directory you want the state created in
