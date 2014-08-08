@@ -28,17 +28,18 @@ ableToBreakLock :: FilePath -> IO (Either StoreError FilePath)
 ableToBreakLock fp = do
   fileExists <- isFile fp
   if fileExists
-    then do
-      ePid <- readFile (encodeString fp) >>= return . readMay :: IO (Maybe Int)
-      putStrLn . show $ ePid
-      case ePid of
-        Just pid -> do
-          exists <- processExists pid
-          if exists
-            then return . Left . StoreIOError $ "Process holding open.lock is already running"
-            else return $ Right fp
-        Nothing -> return . Left . StoreIOError $ "Unable to parse open.lock"
-    else return $ Right fp
+     then do
+       ePid <- readMay <$> readFile (encodeString fp) :: IO (Maybe Int)
+       putStrLn . show $ ePid
+       case ePid of
+         Just pid -> do
+           exists <- processExists pid
+           return $
+             if exists
+                then Left . StoreIOError $ "Process holding open.lock is already running"
+                else Right fp
+         Nothing -> return . Left . StoreIOError $ "Unable to parse open.lock"
+     else return $ Right fp
 
 -- | Catch all errors that allow the lock to still be taken
 ableToBreakLockError :: IOError -> Bool
