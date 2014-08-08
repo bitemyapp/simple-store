@@ -60,7 +60,7 @@ openSimpleStore fp = do
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 makeSimpleStore dir state = do
   fp <- initializeDirectory dir
-  attemptTakeLock fp
+  _ <- attemptTakeLock fp
   let encodedState = S.encode state
       checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ "checkpoint.st")
       initialVersion = 0
