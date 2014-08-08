@@ -48,7 +48,7 @@ releaseLock store = atomically $ putTMVar (storeLock store) StoreLock
 -- This is a cheap version of a transaction
 withLock :: SimpleStore st -> IO b -> IO b
 withLock store func = do
-  obtainLock store
+  _ <- obtainLock store
   finally func $ releaseLock store
 
 -- | Check if a process exists
