@@ -76,9 +76,7 @@ createStore fp fHandle version st = do
 
 -- Checks the extension of a filepath for ".st"
 isState :: FilePath -> Bool
-isState fp = case extension fp of
-              (Just ext) -> if ext == "st" then True else False
-              Nothing -> False
+isState fp = extension fp == Just "st"
 
 -- Release the handle for a simplestore state file
 closeStoreHandle :: SimpleStore st -> IO ()
