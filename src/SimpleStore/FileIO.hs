@@ -97,7 +97,7 @@ openNewestStore f (x:xs) = do
     Left _ -> openNewestStore f xs
     _ -> return res
   where  hIOException :: (a -> IO (Either StoreError b)) -> [a] -> IOException -> IO (Either StoreError b)
-         hIOException func ys _e = openNewestStore func ys
+         hIOException func ys _ = openNewestStore func ys
 
 -- Attempt to open a store from a filepath
 createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
