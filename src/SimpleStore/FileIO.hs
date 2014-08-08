@@ -111,7 +111,7 @@ createStoreFromFilePath fp = do
 -- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
 checkpoint store = do
-  fp <- (readTVarIO . storeDir $ store)
+  fp <- readTVarIO . storeDir $ store
   state <- readTVarIO tState
   oldVersion <- readTVarIO tVersion
   let newVersion = (oldVersion + 1) `mod` 5
@@ -141,9 +141,7 @@ initializeDirectory :: FilePath -> IO FilePath
 initializeDirectory dir = do
   fp <- makeAbsoluteFp dir
   exists <- isDirectory fp
-  if exists
-    then removeTree fp
-    else return ()
+  when exists $ removeTree fp
   createDirectory True fp
   return fp
 
