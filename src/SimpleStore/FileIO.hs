@@ -43,11 +43,18 @@ ableToBreakLock fp = do
 
 -- | Catch all errors that allow the lock to still be taken
 ableToBreakLockError :: IOError -> Bool
+ableToBreakLockError = isDoesNotExistError
+
+{- Old version of 'ableToBreakLockError'
+
+ableToBreakLockError :: IOError -> Bool
 ableToBreakLockError e
   | isAlreadyInUseError e = False
   | isDoesNotExistError e = True
   | isPermissionError e = False
   | otherwise = False
+
+-}
 
 -- | Create a lock file with the current process pid in it
 -- The lock file should already be empty or non existent
