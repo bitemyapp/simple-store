@@ -126,13 +126,13 @@ checkpoint store = do
         tHandle = storeHandle store
         updateIfWritten _ l@(Left _) _ _= return l
         updateIfWritten old _ version fHandle = do
-          removeFile old
           oHandle <- atomically $ do
             writeTVar tVersion version
             oldHandle <- takeTMVar tHandle
             putTMVar tHandle fHandle
             return oldHandle
           hClose oHandle
+          removeFile old          
           return . Right $ ()
 
 -- Initialize a directory by adding the working directory and checking if it already exists.

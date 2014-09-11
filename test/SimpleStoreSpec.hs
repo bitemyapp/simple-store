@@ -71,6 +71,7 @@ spec = do
           functions = replicate 100  (\tv x -> (atomically $ readTMVar tv) >> (return . modifyX $ x))
       waitTVar <- newEmptyTMVarIO
       (Right store) <- makeSimpleStore dir initial
+      
       createCheckpoint store
       aRes <- traverse (\func -> async $ do
                           modifySimpleStore store (func waitTVar)

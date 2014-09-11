@@ -90,3 +90,4 @@ modifySimpleStore store func = withLock store $ do
 -- | Write the current store to disk in the given folder
 createCheckpoint :: (S.Serialize st) => SimpleStore st -> IO (Either StoreError ())
 createCheckpoint store = withLock store $ checkpoint store
+
