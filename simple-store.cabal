@@ -4,8 +4,8 @@ Author:                 Kevin Cotrone <kevincotrone@gmail.com>
 Maintainer:             Kevin Cotrone <kevincotrone@gmail.com>
 License:                BSD3
 License-File:           LICENSE
--- Synopsis:               
--- Description:            
+Synopsis:               An atomic, durable, and transactional data store 
+Description:            An atomic, durable, and transactional data store 
 Cabal-Version:          >= 1.10
 Build-Type:             Simple
 
@@ -53,4 +53,5 @@ Test-Suite spec
 
 Source-Repository head
   Type:                 git
---  Location:             
+  Location:             git@github.com:plow-technologies/simple-store.git
+            
