@@ -3,13 +3,13 @@
 module SimpleStoreSpec (main, spec) where
 
 import           Control.Applicative
-import           Control.Concurrent
+-- import           Control.Concurrent
 import           Control.Concurrent.Async
 import           Control.Concurrent.STM
-import           Control.Concurrent.STM.TMVar
+-- import           Control.Concurrent.STM.TMVar
 import           Data.Either
 import           Data.Traversable
-import           Data.Traversable
+-- import           Data.Traversable
 import           Filesystem
 import           Filesystem.Path
 import           Prelude                      hiding (sequence)
@@ -19,14 +19,30 @@ import           Test.Hspec
 main :: IO ()
 main = hspec spec
 
+makeTestStore = do 
+   let x = 10 :: Int
+       dir = "test-states"
+   workingDir <- getWorkingDirectory
+   eStore <- makeSimpleStore dir x 
+   return (eStore,dir,x,workingDir)
+
+
+makeTestTextStore = do 
+   let x = "10" :: String
+       dir = "test-states"
+   workingDir <- getWorkingDirectory
+   eStore <- makeSimpleStore dir x 
+   return (eStore,dir,x,workingDir)
+
 spec :: Spec
 spec = do
   describe "Making, creating checkpoints, closing, reopening" $ do
     it "should open an initial state, create checkpoints, and then open the state back up" $ do
-      let x = 10 :: Int
-          dir = "test-states"
-      workingDir <- getWorkingDirectory
-      eStore <- makeSimpleStore dir x
+      -- let x = 10 :: Int
+      --     dir = "test-states"
+      -- workingDir <- getWorkingDirectory
+      -- eStore <- makeSimpleStore dir x
+      (eStore,dir,x,workingDir)  <- makeTestStore
       sequence $ getSimpleStore <$> eStore
       sequence $ createCheckpoint <$> eStore
       sequence $ createCheckpoint <$> eStore
@@ -86,4 +102,5 @@ spec = do
       let store' = either (error . show) id eStore
       x' <- getSimpleStore store'
       x' `shouldBe` (200 :: Int)
+      
 

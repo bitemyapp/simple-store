@@ -19,7 +19,7 @@ import           Prelude                   hiding (FilePath, sequence)
 import           Safe
 import           SimpleStore.Internal
 import           SimpleStore.Types
-import           System.IO                 (hClose)
+import           System.IO                 (hClose,hFlush)
 import           System.IO.Error
 import           System.Posix.Process
 
@@ -107,7 +107,7 @@ createStoreFromFilePath fp = do
   fConts <- BS.hGetContents fHandle
   sequence $ first (StoreIOError . show) $ (createStore (directory fp) fHandle) <$> eVersion <*> decode fConts
 
--- | Create a checkpoint for a store. This attempts to write the error to disk
+-- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
 checkpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
 checkpoint store = do
@@ -119,7 +119,7 @@ checkpoint store = do
       oldCheckpointPath = fp </> (fromText . pack $ (show oldVersion) ++ "checkpoint.st")
       checkpointPath = fp </> (fromText . pack $ (show newVersion) ++ "checkpoint.st")
   newHandle <- openFile checkpointPath ReadWriteMode
-  eFileRes <- catch (Right <$> BS.hPut newHandle encodedState) (return . Left . catchStoreError)
+  eFileRes <- catch (Right <$> (BS.hPut newHandle encodedState)) (return . Left . catchStoreError)  
   updateIfWritten oldCheckpointPath eFileRes newVersion newHandle
   where tState = storeState store
         tVersion = storeCheckpointVersion store
@@ -131,8 +131,9 @@ checkpoint store = do
             oldHandle <- takeTMVar tHandle
             putTMVar tHandle fHandle
             return oldHandle
-          hClose oHandle
-          removeFile old          
+          hClose oHandle    
+          hFlush fHandle
+          removeFile old                
           return . Right $ ()
 
 -- Initialize a directory by adding the working directory and checking if it already exists.
