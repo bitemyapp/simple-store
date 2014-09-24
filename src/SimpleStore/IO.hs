@@ -70,6 +70,11 @@ makeSimpleStore dir state = do
 
 
 
+attemptOpenDefault :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
+attemptOpenDefault fp initialState = do
+  eStore <- openSimpleStore fp
+  either (\_ -> makeSimpleStore fp initialState) (return . Right) eStore
+
 -- | Release the file lock and close the handle to the file allowing another processes to open
 -- the store
 closeSimpleStore :: SimpleStore st -> IO ()
