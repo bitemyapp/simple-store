@@ -69,11 +69,14 @@ makeSimpleStore dir state = do
   Right <$> createStore fp handle initialVersion state
 
 
-
+-- | Attempt to open a store. If the store doesn't it exist it will create the store in the filepath given
+-- with makeSimpleStore.
 attemptOpenDefault :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 attemptOpenDefault fp initialState = do
   eStore <- openSimpleStore fp
   either (\_ -> makeSimpleStore fp initialState) (return . Right) eStore
+
+
 
 -- | Release the file lock and close the handle to the file allowing another processes to open
 -- the store
