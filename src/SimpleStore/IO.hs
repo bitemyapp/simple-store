@@ -88,9 +88,8 @@ closeSimpleStore store = withLock store $ do
 -- | Run a function against the state and put the result into the state
 -- This does not write the store to disk
 modifySimpleStore :: SimpleStore st -> (st -> IO st) -> IO (Either StoreError ())
-modifySimpleStore store func = withLock store $ do
-  state <- readTVarIO tState
-  res <- func state
+modifySimpleStore store modifyFunc = withLock store $ do
+  res <- modifyFunc =<< readTVarIO tState
   Right <$> (atomically $ writeTVar tState res)
   where tState = storeState store
 

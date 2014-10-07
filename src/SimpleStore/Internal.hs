@@ -33,7 +33,7 @@ import           System.IO                    (Handle, hClose)
 
 
 putWriteStore :: SimpleStore st -> st -> IO ()
-putWriteStore store state = atomically . (writeTVar tState) $ state
+putWriteStore store state = atomically $ writeTVar tState state
   where tState = storeState store
 
 -- | Lock a simplestore from being able to be written to

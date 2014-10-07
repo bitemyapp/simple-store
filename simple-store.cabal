@@ -51,7 +51,29 @@ Test-Suite spec
                       , time
                       , async
 
-Source-Repository head
+benchmark simple-store-bench
+  type:                   exitcode-stdio-1.0
+  Hs-Source-Dirs:         bench
+  main-is:                Main.hs
+  build-depends:          base
+                      , hspec
+                      , stm
+                      , system-fileio
+                      , system-filepath
+                      , cereal
+                      , bytestring
+                      , unix
+                      , text
+                      , safe
+                      , bifunctors
+                      , time
+                      , async
+                      , simple-store
+                      , random
+                      , basic-prelude
+  ghc-options:      -O2 -prof -auto-all -caf-all -osuf p_o -hisuf p_hi
+
+Source-Repository head 
   Type:                 git
   Location:             git@github.com:plow-technologies/simple-store.git
             
