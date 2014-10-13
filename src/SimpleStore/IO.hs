@@ -39,17 +39,13 @@ openSimpleStore fp = do
      then do lock <- attemptTakeLock fp
              if isRight lock
                 then do dirContents <- listDirectory dir
-                        print dirContents
                         let files = filter isState dirContents
-                        print files
                         modifiedDates <-
                            traverse (\file -> do               -- Lambda is because the instance for Traversable on ()
                                         t <- getModified file  -- Traverses the second item so sequence only evaluates
                                         return (t,file)        -- the second item
                                        ) files
-                        print modifiedDates
                         let sortedDates = snd <$> sortBy (compare `on` snd) modifiedDates
-                        print sortedDates
                         openNewestStore createStoreFromFilePath sortedDates
                 else return . Left $ StoreLocked
      else return . Left $ StoreFolderNotFound
