@@ -6,5 +6,6 @@ import           SimpleStore.IO    as SimpleStore (closeSimpleStore,
                                                    makeSimpleStore,
                                                    modifySimpleStore,
                                                    openSimpleStore,
+                                                   attemptOpenDefault,
                                                    putSimpleStore)
 import           SimpleStore.Types as SimpleStore (SimpleStore, StoreError (..))
