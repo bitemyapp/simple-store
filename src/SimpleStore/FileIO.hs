@@ -30,7 +30,6 @@ ableToBreakLock fp = do
   if fileExists
      then do
        ePid <- readMay <$> readFile (encodeString fp) :: IO (Maybe Int)
-       putStrLn . show $ ePid
        case ePid of
          Just pid -> do
            exists <- processExists pid
