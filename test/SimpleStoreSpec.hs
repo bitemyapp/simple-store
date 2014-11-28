@@ -1,6 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-module SimpleStoreSpec (main, spec) where
+module SimpleStoreSpec (main
+                       , spec
+                       , makeTestStore) where
 
 import           Control.Applicative
 -- import           Control.Concurrent

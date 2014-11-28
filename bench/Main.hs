@@ -24,7 +24,7 @@ import           System.Random
 
 main :: IO ()
 main = do
-  benchN 100 100
+  benchN 100 1000
   putStrLn "Finished bench"
   putStrLn "Goodbye"
 
