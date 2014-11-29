@@ -53,6 +53,7 @@ runMemTestLoop count (eStore ,dir ,x ,workingDir )
                (Right store) -> do
                      x' <- getSimpleStore store
                      eT <- modifySimpleStore store (return)
+                     createCheckpoint store
                      print eT
                      if (x == x')                     
                      then (runMemTestLoop (succ count) (eStore ,dir ,x' ,workingDir))
