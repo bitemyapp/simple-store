@@ -9,11 +9,11 @@ import Filesystem.Path
 
 
 data SimpleStore st = SimpleStore {
-    storeDir               :: TVar FilePath
-  , storeState             :: TVar st
-  , storeLock              :: TMVar StoreLock
-  , storeHandle            :: TMVar Handle
-  , storeCheckpointVersion :: TVar Int
+    storeDir               :: !(TVar FilePath)
+  , storeState             :: !(TVar st)
+  , storeLock              :: !(TMVar StoreLock)
+  , storeHandle            :: !(TMVar Handle)
+  , storeCheckpointVersion :: !(TVar Int)
 }
 
 data StoreLock = StoreLock

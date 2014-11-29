@@ -104,7 +104,9 @@ createStoreFromFilePath fp = do
   let eVersion = getVersionNumber . filename $ fp
   fHandle <- openFile fp ReadWriteMode
   fConts <- BS.hGetContents fHandle
-  sequence $ first (StoreIOError . show) $ (createStore (directory fp) fHandle) <$> eVersion <*> decode fConts
+  sequence $ first (StoreIOError . show) $ (createStore (directory fp) fHandle) <$> 
+                                           eVersion <*> 
+                                           decode fConts
 
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
@@ -115,10 +117,10 @@ checkpoint store = do
   oldVersion <- readTVarIO tVersion
   let newVersion = (oldVersion + 1) `mod` 5
       encodedState = encode state
-      oldCheckpointPath = fp </> (fromText . pack $ (show oldVersion) ++ "checkpoint.st")
-      checkpointPath = fp </> (fromText . pack $ (show newVersion) ++ "checkpoint.st")
+      oldCheckpointPath = fp </> fromText  ( Data.Text.append (pack . show $ oldVersion)  "checkpoint.st")
+      checkpointPath = fp </> fromText  ( Data.Text.append ( pack.show $ newVersion)  "checkpoint.st")
   newHandle <- openFile checkpointPath ReadWriteMode
-  eFileRes <- catch (Right <$> (BS.hPut newHandle encodedState)) (return . Left . catchStoreError)  
+  eFileRes <- catch (Right <$> BS.hPut newHandle encodedState) (return . Left . catchStoreError)  
   updateIfWritten oldCheckpointPath eFileRes newVersion newHandle
   where tState = storeState store
         tVersion = storeCheckpointVersion store
