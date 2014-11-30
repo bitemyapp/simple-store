@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 
 
@@ -9,8 +10,9 @@
 
 import GHC.Generics 
 import Data.Serialize
--- import           Control.Concurrent.STM.TMVar
-import Control.Concurrent (threadDelay)
+import Control.Monad
+-- import           Control.Concurrent.STM.TMVarp
+import Control.Concurrent (threadDelay, forkIO)
 import           Data.Either
 import           Data.Traversable
 -- import           Data.Traversable
@@ -24,7 +26,7 @@ import           SimpleStore
 
 
 newtype TestNum = TestNum { unNum::Int}
- deriving (Generic,Show,Eq)
+ deriving (Generic,Show,Eq,Num,Integral,Real,Enum,Ord)
 
 instance Serialize TestNum where 
 
@@ -35,29 +37,23 @@ intList = TestNum <$> [0 .. 1000]
 main :: IO () 
 main = do dataSet <- traverse makeTestStores  intList
           putStrLn "starting memory loop"
-          _ <- traverse (runMemTestLoop 0 ) dataSet
-          return () 
+          _ <- traverse (\l -> forkIO (runMemTestLoop l ) ) dataSet
+          forever $ do 
+                 threadDelay (10*1000*1000)
+                 return ()
 
-loopMax :: Int
-loopMax = 1*1000*1000
 
-runMemTestLoop count (eStore ,dir ,x ,workingDir )
-  | count > loopMax = (removeTree $ workingDir </> dir) >>
-                      return () 
-  | otherwise = do 
-       threadDelay (1*100)
+runMemTestLoop  (eStore ,dir ,x ,workingDir ) = do 
+       threadDelay (1*1000*1000)
        st <- traverse getSimpleStore eStore
-       print st
        case eStore of
                (Left err) -> fail "Unable to open local state"
                (Right store) -> do
                      x' <- getSimpleStore store
-                     eT <- modifySimpleStore store (return)
+                     eT <- modifySimpleStore store (\x -> return (mod (x + 1) 10000))
                      createCheckpoint store
-                     print eT
-                     if (x == x')                     
-                     then (runMemTestLoop (succ count) (eStore ,dir ,x' ,workingDir))
-                     else fail "states are no longer equal"
+                     print x'
+                     runMemTestLoop (eStore ,dir ,x' ,workingDir)
 
 
 makeTestStores i = do 
