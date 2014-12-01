@@ -22,16 +22,16 @@ Library
                       , SimpleStore.IO
                       , SimpleStore.FileIO
   Build-Depends:        base >= 4 && < 5
-                      , stm
-                      , system-fileio
-                      , system-filepath
-                      , cereal
-                      , bytestring
-                      , unix
+                      , stm >= 2.4.3
+                      , system-fileio >= 0.3.15
+                      , system-filepath >= 0.4.12
+                      , cereal >= 0.4.1.0
+                      , bytestring >= 0.10.4.0
+                      , unix >= 2.7.0.1
                       , text >= 1.1 && < 1.2
-                      , safe
-                      , bifunctors
-                      , time
+                      , safe >= 0.3.8
+                      , bifunctors >= 4.2.2
+                      , time >= 1.4.2
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
