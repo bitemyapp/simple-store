@@ -39,6 +39,7 @@ main = do dataSet <- traverse makeTestStores  intList
           putStrLn "starting memory loop"
           _ <- traverse (\l -> forkIO (runMemTestLoop l ) ) dataSet           
           threadDelay (60*1000*1000)
+          removeTree "xkcd-test-states"
           return ()
 
 
@@ -56,6 +57,7 @@ runMemTestLoop  (eStore ,dir ,x ,workingDir ) = do
 
 
 makeTestStores i = do 
+   createDirectory True "xkcd-test-states"
    let dir = Filesystem.Path.concat ["xkcd-test-states" , decodeString.show $ i]
    workingDir <- getWorkingDirectory
    eStore <- makeSimpleStore dir i 
