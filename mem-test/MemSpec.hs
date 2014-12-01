@@ -38,7 +38,6 @@ main :: IO ()
 main = do dataSet <- traverse makeTestStores  intList
           putStrLn "starting memory loop"
           _ <- traverse (\l -> forkIO (runMemTestLoop l ) ) dataSet           
-          threadDelay (60*1000*1000)
           removeTree "xkcd-test-states"
           return ()
 

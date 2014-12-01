@@ -22,7 +22,7 @@ test:
     - cabal configure
     - cabal build -j1:
         timeout: 3000
-    - cabal test --show-details=always -j1:
+    - cabal test --show-details=always -j2:
         timeout: 3000
 
 # deployment:
