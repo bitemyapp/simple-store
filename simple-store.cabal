@@ -30,7 +30,7 @@ Library
                       , unix >= 2.7.0.1
                       , text >= 1.1 && < 1.2
                       , safe >= 0.3.8
-                      , bifunctors >= 4.2.2
+                      , bifunctors >= 4.2
                       , time >= 1.4.2
 
 Test-Suite spec
