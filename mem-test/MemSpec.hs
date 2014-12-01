@@ -37,10 +37,9 @@ intList = TestNum <$> [0 .. 1000]
 main :: IO () 
 main = do dataSet <- traverse makeTestStores  intList
           putStrLn "starting memory loop"
-          _ <- traverse (\l -> forkIO (runMemTestLoop l ) ) dataSet
-          forever $ do 
-                 threadDelay (10*1000*1000)
-                 return ()
+          _ <- traverse (\l -> forkIO (runMemTestLoop l ) ) dataSet           
+          threadDelay (60*1000*1000)
+          return ()
 
 
 runMemTestLoop  (eStore ,dir ,x ,workingDir ) = do 
