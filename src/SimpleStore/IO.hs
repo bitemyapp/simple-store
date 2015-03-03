@@ -36,18 +36,18 @@ openSimpleStore fp = do
   dir <- makeAbsoluteFp fp
   exists <- isDirectory dir
   if exists
-     then do lock <- attemptTakeLock fp
-             if isRight lock
-                then do dirContents <- listDirectory dir
-                        let files = filter isState dirContents
-                        modifiedDates <-
-                           traverse (\file -> do               -- Lambda is because the instance for Traversable on ()
-                                        t <- getModified file  -- Traverses the second item so sequence only evaluates
-                                        return (t,file)        -- the second item
-                                       ) files
-                        let sortedDates = snd <$> sortBy (compare `on` snd) modifiedDates
-                        openNewestStore createStoreFromFilePath sortedDates
-                else return . Left $ StoreLocked
+     then do attemptTakeLock fp >>= either
+               (return . Left)
+               (\_ -> 
+                 do dirContents <- listDirectory dir
+                    let files = filter isState dirContents
+                    modifiedDates <-
+                       traverse (\file -> do               -- Lambda is because the instance for Traversable on ()
+                                    t <- getModified file  -- Traverses the second item so sequence only evaluates
+                                    return (t,file)        -- the second item
+                                   ) files
+                    let sortedDates = snd <$> sortBy (compare `on` snd) modifiedDates
+                    openNewestStore createStoreFromFilePath sortedDates)
      else return . Left $ StoreFolderNotFound
 
 -- | Initialize a simple store from a given filepath and state.
@@ -55,14 +55,15 @@ openSimpleStore fp = do
 -- as in "state"
 makeSimpleStore :: (S.Serialize st) => FilePath -> st -> IO (Either StoreError (SimpleStore st))
 makeSimpleStore dir state = do
-  fp <- initializeDirectory dir
-  _ <- attemptTakeLock fp
-  let encodedState = S.encode state
-      checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ "checkpoint.st")
-      initialVersion = 0
-  writeFile checkpointPath encodedState
-  handle <- openFile checkpointPath ReadWriteMode
-  Right <$> createStore fp handle initialVersion state
+  initializeDirectory dir >>= either 
+    (return . Left)
+    (\fp -> do
+      let encodedState = S.encode state
+          checkpointPath = fp </> (fromText . pack $ (show initialVersion) ++ "checkpoint.st")
+          initialVersion = 0
+      writeFile checkpointPath encodedState
+      handle <- openFile checkpointPath ReadWriteMode
+      Right <$> createStore fp handle initialVersion state)
 
 
 -- | Attempt to open a store. If the store doesn't it exist it will create the store in the filepath given

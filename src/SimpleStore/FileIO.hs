@@ -35,7 +35,7 @@ ableToBreakLock fp = do
            exists <- processExists pid
            return $
              if exists
-                then Left . StoreIOError $ "Process holding open.lock is already running"
+                then Left . StoreIOError $ "Process holding " ++ show fp ++ " is already running"
                 else Right fp
          Nothing -> return . Left . StoreIOError $ "Unable to parse open.lock"
      else return $ Right fp
@@ -68,18 +68,18 @@ createLock fp = do
 attemptTakeLock :: FilePath -> IO (Either StoreError ())
 attemptTakeLock baseFP = do
   let fp = baseFP </> (fromText "open.lock")
-  allowBreak <- ableToBreakLock fp
-  res <- sequence $ createLock <$> allowBreak
-  return . join $ res
-
+  ableToBreakLock fp >>=
+    either 
+      (return . Left)
+      createLock
+--
 -- | release the lock for a given store
 releaseFileLock :: SimpleStore st -> IO ()
 releaseFileLock store = do
   fp <- (</> fromText "open.lock") <$> (atomically . readTVar . storeDir $ store)
   exists <- isFile fp
-  when exists $ removeFile fp
+  when exists $ removeFile fp-- Catch errors for storing so they aren't thrown
 
--- Catch errors for storing so they aren't thrown
 catchStoreError :: IOError -> StoreError
 catchStoreError e
   | isAlreadyInUseError e = StoreAlreadyOpen
@@ -139,13 +139,16 @@ checkpoint store = do
 
 -- Initialize a directory by adding the working directory and checking if it already exists.
 -- If the folder already exists it deletes it and creates a new directory
-initializeDirectory :: FilePath -> IO FilePath
+initializeDirectory :: FilePath -> IO (Either StoreError FilePath)
 initializeDirectory dir = do
   fp <- makeAbsoluteFp dir
-  exists <- isDirectory fp
-  when exists $ removeTree fp
-  createDirectory True fp
-  return fp
+  exists <- (||) <$> isFile fp <*> isDirectory fp
+  if exists
+    then return $ Left StoreDirectoryAlreadyExists
+    else 
+      do
+        createDirectory True fp
+        fmap (const fp) <$> attemptTakeLock fp
 
 makeAbsoluteFp :: FilePath -> IO FilePath
 makeAbsoluteFp fp = do
