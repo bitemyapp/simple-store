@@ -4,7 +4,8 @@
 module SimpleStore.FileIO where
 
 import           Control.Applicative
-import           Control.Concurrent.STM
+import           Control.Concurrent.ReadWriteVar (RWVar)
+import qualified Control.Concurrent.ReadWriteVar as RWVar
 import           Control.Exception
 import           Control.Monad             hiding (sequence)
 import           Data.Bifunctor
@@ -74,12 +75,14 @@ attemptTakeLock baseFP = do
       createLock
 --
 -- | release the lock for a given store
-releaseFileLock :: SimpleStore st -> IO ()
+releaseFileLock :: SimpleStoreRecord st -> IO () 
 releaseFileLock store = do
-  fp <- (</> fromText "open.lock") <$> (atomically . readTVar . storeDir $ store)
+  let fp = storeDir store </> fromText "open.lock"
   exists <- isFile fp
-  when exists $ removeFile fp-- Catch errors for storing so they aren't thrown
+  putStrLn $ "releasing lock " ++ (show $ storeDir store </> fromText "open.lock")
+  when exists $ removeFile fp >> putStrLn ("deleted " ++ (show $ storeDir store </> fromText "open.lock"))
 
+-- Catch errors for storing so they aren't thrown
 catchStoreError :: IOError -> StoreError
 catchStoreError e
   | isAlreadyInUseError e = StoreAlreadyOpen
@@ -93,10 +96,10 @@ openNewestStore _ [] = return . Left $ StoreFileNotFound
 openNewestStore f (x:xs) = do
   res <- catch (f x) (hIOException f xs)
   case res of
-    Left _ -> openNewestStore f xs
+    Left err -> print err >> openNewestStore f xs
     _ -> return res
   where  hIOException :: (a -> IO (Either StoreError b)) -> [a] -> IOException -> IO (Either StoreError b)
-         hIOException func ys _ = openNewestStore func ys
+         hIOException func ys err = print err >> openNewestStore func ys
 
 -- Attempt to open a store from a filepath
 createStoreFromFilePath :: (Serialize st) => FilePath -> IO (Either StoreError (SimpleStore st))
@@ -104,38 +107,29 @@ createStoreFromFilePath fp = do
   let eVersion = getVersionNumber . filename $ fp
   fHandle <- openFile fp ReadWriteMode
   fConts <- BS.hGetContents fHandle
-  sequence $ first (StoreIOError . show) $ (createStore (directory fp) fHandle) <$> 
+  sequence $ first (StoreIOError . show) $ (createStore $ directory fp) <$> 
                                            eVersion <*> 
                                            decode fConts
 
 -- | Create a checkpoint for a store. This attempts to write the state to disk
 -- If successful it updates the version, releases the old file handle, and deletes the old file
-checkpoint :: (Serialize st) => SimpleStore st -> IO (Either StoreError ())
+checkpoint :: (Serialize st) => SimpleStoreRecord st -> IO (Either StoreError (SimpleStoreRecord st))
 checkpoint store = do
-  fp <- readTVarIO . storeDir $ store
-  state <- readTVarIO tState
-  oldVersion <- readTVarIO tVersion
-  let newVersion = (oldVersion + 1) `mod` 5
+  let fp    = storeDir store
+      state = storeState store
+      oldVersion = storeCheckpointVersion store
+      newVersion = (oldVersion + 1) `mod` 5
       encodedState = encode state
       oldCheckpointPath = fp </> fromText  ( Data.Text.append (pack . show $ oldVersion)  "checkpoint.st")
       checkpointPath = fp </> fromText  ( Data.Text.append ( pack.show $ newVersion)  "checkpoint.st")
-  newHandle <- openFile checkpointPath ReadWriteMode
-  eFileRes <- catch (Right <$> BS.hPut newHandle encodedState) (return . Left . catchStoreError)  
-  updateIfWritten oldCheckpointPath eFileRes newVersion newHandle
-  where tState = storeState store
-        tVersion = storeCheckpointVersion store
-        tHandle = storeHandle store
-        updateIfWritten _ l@(Left _) _ _= return l
-        updateIfWritten old _ version fHandle = do
-          oHandle <- atomically $ do
-            writeTVar tVersion version
-            oldHandle <- takeTMVar tHandle
-            putTMVar tHandle fHandle
-            return oldHandle
-          hClose oHandle    
-          hFlush fHandle
-          removeFile old                
-          return . Right $ ()
+  handle <- openFile checkpointPath ReadWriteMode
+  eFileRes <- catch (Right <$> (BS.hPut handle encodedState >> hClose handle)) (return . Left . catchStoreError)  
+  either
+    (\err -> return $ Left err)
+    (\result -> do
+      removeFile oldCheckpointPath
+      return $ Right $ store { storeCheckpointVersion = newVersion })
+    eFileRes
 
 -- Initialize a directory by adding the working directory and checking if it already exists.
 -- If the folder already exists it deletes it and creates a new directory

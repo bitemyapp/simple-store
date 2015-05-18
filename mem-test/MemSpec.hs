@@ -44,13 +44,15 @@ main = do dataSet <- traverse makeTestStores  intList
 
 runMemTestLoop  (eStore ,dir ,x ,workingDir ) = do 
        threadDelay (1*1000*1000)
-       st <- traverse getSimpleStore eStore
+       st <- traverse (\store -> runStoreM $ withReadLock store $ readSimpleStore StoreHere) eStore
        case eStore of
                (Left err) -> fail "Unable to open local state"
                (Right store) -> do
-                     x' <- getSimpleStore store
-                     eT <- modifySimpleStore store (\x -> return (mod (x + 1) 10000))
-                     createCheckpoint store
+                     (Right x') <- runStoreM $ withReadLock store $ readSimpleStore StoreHere
+                     eT <- runStoreM $ withWriteLock store $ do
+                       x <- readSimpleStore StoreHere
+                       writeSimpleStore StoreHere (mod (x + 1) 10000)
+                       checkpointSimpleStore StoreHere
                      print x'
                      runMemTestLoop (eStore ,dir ,x' ,workingDir)
 

@@ -1,5 +1,5 @@
 Name:                   simple-store
-Version:                0.2.0
+Version:                0.3.0
 Author:                 Kevin Cotrone <kevincotrone@gmail.com>
 Maintainer:             Kevin Cotrone <kevincotrone@gmail.com>
 License:                BSD3
@@ -22,7 +22,6 @@ Library
                       , SimpleStore.IO
                       , SimpleStore.FileIO
   Build-Depends:        base >= 4 && < 5
-                      , stm >= 2.4.3
                       , system-fileio >= 0.3.15
                       , system-filepath >= 0.4.12
                       , cereal >= 0.4.1.0
@@ -32,6 +31,8 @@ Library
                       , safe >= 0.3.8
                       , bifunctors >= 4.2
                       , time >= 1.4.2
+                      , concurrent-extra
+                      , transformers >= 0.4 && < 0.5
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
@@ -42,7 +43,6 @@ Test-Suite spec
   Main-Is:              Spec.hs
   Build-Depends:        base
                       , hspec
-                      , stm
                       , system-fileio
                       , system-filepath
                       , cereal
@@ -53,6 +53,10 @@ Test-Suite spec
                       , bifunctors
                       , time
                       , async
+                      , concurrent-extra
+                      , transformers >= 0.4 && < 0.5
+                      , stm
+                     
 
 Test-Suite mem-spec 
   Type:                 exitcode-stdio-1.0
@@ -64,7 +68,6 @@ Test-Suite mem-spec
   Main-Is:              MemSpec.hs
   Build-Depends:        base
                       , hspec
-                      , stm
                       , system-fileio
                       , system-filepath
                       , cereal
@@ -75,6 +78,9 @@ Test-Suite mem-spec
                       , bifunctors
                       , time
                       , async
+                      , concurrent-extra
+                      , transformers >= 0.4 && < 0.5
+                      , stm
 
 
 benchmark simple-store-bench
@@ -85,7 +91,6 @@ benchmark simple-store-bench
   main-is:                Main.hs
   build-depends:          base
                       , hspec
-                      , stm
                       , system-fileio
                       , system-filepath
                       , cereal
@@ -99,6 +104,9 @@ benchmark simple-store-bench
                       , simple-store
                       , random
                       , basic-prelude
+                      , concurrent-extra
+                      , transformers >= 0.4 && < 0.5
+                      , stm
   Ghc-Options:          -threaded -Wall  -rtsopts -prof -auto-all 
  
 Source-Repository head 
