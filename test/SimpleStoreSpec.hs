@@ -8,6 +8,7 @@ import           Control.Applicative
 import           Control.Concurrent (myThreadId)
 import           Control.Concurrent.Async
 import           Control.Concurrent.STM
+import           Control.Exception
 import           Control.Monad.IO.Class (liftIO)
 -- import           Control.Concurrent.STM.TMVar
 import           Control.Monad (when)
@@ -43,7 +44,7 @@ spec = do
   describe "Making, creating checkpoints, closing, reopening" $ do
     it "should open an initial state, create checkpoints, and then open the state back up" $ do
       workingDir <- getWorkingDirectory
-      removeTree $ workingDir </> "test-states"
+      catch (removeTree $ workingDir </> "test-states") (const $ return () :: SomeException -> IO ())
       -- let x = 10 :: Int
       --     dir = "test-states"
       -- workingDir <- getWorkingDirectory
@@ -96,13 +97,14 @@ spec = do
       waitTVar <- newEmptyTMVarIO
       (Right store) <- makeSimpleStore dir initial
       runStoreM $ withWriteLock store $ checkpointSimpleStore StoreHere
-      aRes <- traverse (\func -> async $ do
+      aRes <- traverse (\func -> async $ flip catch (print :: SomeException -> IO ()) $ do
                           atomically $ readTMVar waitTVar
-                          runStoreM $ withWriteLock store $ do
+                          keepTrying $ runStoreM $ withWriteLock store $ do
                             x <- readSimpleStore StoreHere 
                             x' <- liftIO $ func x
                             writeSimpleStore StoreHere x'
-                            checkpointSimpleStore StoreHere)
+                            checkpointSimpleStore StoreHere
+                          return ())
                        functions
       atomically $ putTMVar waitTVar ()
       results <- traverse wait aRes
@@ -114,5 +116,9 @@ spec = do
       let store' = either (error . show) id eStore
       (Right x') <- runStoreM $ withReadLock store $ readSimpleStore StoreHere
       x' `shouldBe` (200 :: Int)
+
+keepTrying :: IO (Either err a) -> IO a
+keepTrying action = do
+  action >>= either (const $ keepTrying action) return
       
 
