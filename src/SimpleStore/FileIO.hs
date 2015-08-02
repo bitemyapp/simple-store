@@ -22,6 +22,7 @@ import           SimpleStore.Types
 import           System.IO                 (hClose,hFlush)
 import           System.IO.Error
 import           System.Posix.Process
+import           System.Mem
 
 -- | Return the given filepath if it is able to break the open.lock file
 ableToBreakLock :: FilePath -> IO (Either StoreError FilePath)
@@ -134,7 +135,8 @@ checkpoint store = do
             return oldHandle
           hClose oHandle    
           hFlush fHandle
-          removeFile old                
+          removeFile old
+          performGC
           return . Right $ ()
 
 -- Initialize a directory by adding the working directory and checking if it already exists.
